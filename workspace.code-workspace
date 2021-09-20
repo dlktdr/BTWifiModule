@@ -2,10 +2,6 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"name": "WIFI Test",
-			"path": "..\\WIFI Test"
 		}
 	],
 	"settings": {
