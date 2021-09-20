@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "WIFI Test",
+			"path": "..\\WIFI Test"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"esp_gap_ble_api.h": "c",
+			"*.ipp": "c",
+			"system_error": "c"
+		}
+	}
+}
