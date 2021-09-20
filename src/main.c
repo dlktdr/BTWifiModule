@@ -16,7 +16,6 @@
  *
  ****************************************************************************/
 
-#include "atcommands.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
 #include "esp_bt.h"
@@ -181,8 +180,8 @@ static const uint16_t primary_service_uuid = ESP_GATT_UUID_PRI_SERVICE;
 static const uint16_t character_declaration_uuid = ESP_GATT_UUID_CHAR_DECLARE;
 static const uint16_t character_client_config_uuid =
     ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
-static const uint8_t char_prop_read = ESP_GATT_CHAR_PROP_BIT_READ;
-static const uint8_t char_prop_write = ESP_GATT_CHAR_PROP_BIT_WRITE;
+//static const uint8_t char_prop_read = ESP_GATT_CHAR_PROP_BIT_READ;
+//static const uint8_t char_prop_write = ESP_GATT_CHAR_PROP_BIT_WRITE;
 static const uint8_t char_prop_read_write_notify =
     ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_READ |
     ESP_GATT_CHAR_PROP_BIT_NOTIFY;
@@ -356,9 +355,6 @@ void example_exec_write_event_env(prepare_type_env_t *prepare_write_env,
 static uint8_t buffer[BLUETOOTH_LINE_LENGTH + 1];
 static uint16_t chan_vals[BT_CHANNELS];
 static uint8_t bufferIndex;
-static const uint8_t START_STOP = 0x7E;
-static const uint8_t BYTE_STUFF = 0x7D;
-static const uint8_t STUFF_MASK = 0x20;
 static uint8_t crc;
 
 // Part of setTrainer to calculate CRC
@@ -610,57 +606,126 @@ static void gatts_event_handler(esp_gatts_cb_event_t event,
   } while (0);
 }
 
-void serialSendChar(const char *c)
+void parserBTData(const char btdata[], int len)
 {
-
+  printf("BT DATA: ");
+  for(int i=0; i < len; i++) {
+    printf("%x ", btdata[i]);
+  }
+  printf("\n");
 }
 
-void atCommandParse(const char atcommand[])
-{
+const uart_port_t uart_num = UART_NUM_2;
 
+#define UART_WRITE_STRING(x,y) uart_write_bytes(x, y, sizeof(y))
+
+typedef enum {
+  BT_MODE_NONE,
+  BT_MODE_PERIPHERAL,
+  BT_MODE_CENTRAL
+} btmode;
+
+btmode curMode = BT_MODE_NONE;
+
+char lcladdress[13] = "00XX00XX00XX";
+
+inline void sendBTMode()
+{
+  char buff[50];
+
+  if(curMode == BT_MODE_PERIPHERAL) {
+
+    snprintf(buff, sizeof(buff), "Peripheral:%s", lcladdress);
+    uart_write_bytes(uart_num, buff, strlen(buff));
+  } else if(curMode == BT_MODE_CENTRAL) {
+    UART_WRITE_STRING(uart_num, "OK+Role:0\r\n");
+    snprintf(buff, sizeof(buff), "Central:%s", lcladdress);
+    uart_write_bytes(uart_num, buff, strlen(buff));
+  }
 }
 
-void parseSerialIn(uint8_t *dat, size_t len) {
-  if (len == 0) return;
-
-  static uint8_t buffer[200];
-  static uint8_t atCmdbuf[50];
-  static int buflen = 0;
-  static int startATind=-1;
-  static int stopATind=-1;
-  static int atCmdBufPos=0;
-
-  if (len + buflen < sizeof(buffer)) {
-    memcpy(&buffer[buflen], dat, len);
-    buflen += len;
+void parserATCommand(char atcommand[])
+{  
+  // Strip trailing whitespace
+  bool done=false;
+  while(!done) {
+    int len = strlen(atcommand);
+    if(len > 0 && (atcommand[len-1] == '\n' || atcommand[len-1] == '\r'))
+      atcommand[len-1] = '\0';
+    else
+      done = true;
   }
-  else {
-    printf("Serial Buffer Overflow");
-    buflen = 0;
-    return;
-  }
- 
-  // Loop through all data in buffer
-  for(int i=2; i < buflen; i++) {
-    if(startATind < 0 && buffer[i-2] == 'A' &&
-                         buffer[i-1] == 'T' && 
-                         buffer[i]   == '+') {
-      startATind = i;
-      atCmdBufPos = 0;
-    } else if (startATind >= 0) { // Got the AT+ in the stream somewhere
-      if(buffer[i] == '\n' && buffer[i-1] == '\r') { // End of AT Command
-        atCommandParse(atCmdbuf);
-        startATind = -1;
-      } else if(buffer[i] != '\r') { // Ignore first \r
-        atCmdbuf[atCmdBufPos++] = buffer[i];        
-      }
-    } else { // Not in the middle of an AT command
+
+  char buff[80];
+
+  if(strncmp(atcommand, "+ROLE0", 6) == 0) {
+    printf("Setting role as Peripheral\n");    
+    curMode = BT_MODE_PERIPHERAL;
+    UART_WRITE_STRING(uart_num, "OK+Role:0\r\n");    
+    sendBTMode();
+
+  } else if (strncmp(atcommand, "+ROLE1", 6) == 0) {
+    printf("Setting role as Central\n");
+    curMode = BT_MODE_CENTRAL;
+    UART_WRITE_STRING(uart_num, "OK+Role:1\r\n");    
+    sendBTMode();
+    // Should auto start discovery here too
+
+  } else if (strncmp(atcommand, "+CONE", 5) == 0) {
+    if(curMode == BT_MODE_CENTRAL) {
+      // Connect to device specified
+      snprintf(buff, sizeof(buff), "OK+CONNA\r\bConnecting to:%s\r\n", atcommand + 5);
+      uart_write_bytes(uart_num, buff, strlen(buff));
+
+      //  - ON Connection, Send
+      // Connected:<ADDRESS>\r\n
+      // MTU Size:65\r\n
+      // MTU Size: 65\r\n
+      // PHY Update Complete\r\n
+      // Current PHY: 2M\r\n
+
+      // Then return any data here...
+
+    } else {
       
-
+      UART_WRITE_STRING(uart_num, "ERROR");          
     }
+
+
+
+  } else if (strncmp(atcommand, "+NAME:", 6) == 0) {
+    printf("Setting Name to %s\n", atcommand + 6);    
+    sendBTMode();
+    // PARA - Doesn't actuall set the name
+    // Bluetooth Trainer Does - (comes in always lowercase)
+    // HERE - follow PARA standards, use Hello as the name
+
+  } else if (strncmp(atcommand, "+TXPW", 5) == 0) {
+    printf("Setting Power to %s\n", atcommand + 5);    
+    UART_WRITE_STRING(uart_num, "OK+Txpw:0\r\n");
+    sendBTMode();
+    // Do Nothing, always max power
+
+  } else if (strncmp(atcommand, "+DISC?", 6) == 0) {
+    printf("Discovery Requested\n");
+
+    // On Disconvery Started Send,
+    // OK+DISCS\r\n
+    // OK+DISC:<ADDR>\r\n
+    // OK+DISC:<ADDR>\r\n
+    // OK+DISC:<ADDR>\r\n
+
+    // On Discovery Complete 
+    // OK+DISCE\r\n
+
+  } else if (strncmp(atcommand, "+CLEAR", 6) == 0) {
+    printf("Disconnecting\n");
+    UART_WRITE_STRING(uart_num, "OK+CLEAR\r\n");
+
+  } else {
+    printf("Unknown AT Cmd: %s\n", atcommand);
+
   }
-
-
 }
 
 // Ticks to wait for data stream to come in
@@ -677,6 +742,9 @@ void runUARTHead() {
       .rx_flow_ctrl_thresh = 122,
   };
 
+  // Configure UART parameters
+  ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
+
   // Set UART pins(TX: IO4, RX: IO5, RTS: IO18, CTS: IO19)
   ESP_ERROR_CHECK(
       uart_set_pin(uart_num, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
@@ -691,40 +759,64 @@ void runUARTHead() {
 
   circular_buffer uartinbuf;
 
-  cb_init(&uartinbuf, 200, 1);  
+  cb_init(&uartinbuf, 200);  
 
-  bool atcmdstarted = false;  
   char atcommand[40];
-  int atcommandlen=0;
+  int atcommandlen=-1;
 
-  bool btdatastarted = false;
   char btcommand[40];
-  char btcommandlen=0;
+  int btcommandlen=-1;
 
   while (1) {
-    uint8_t buffer[50];
+    char buffer[50];
     int cnt = uart_read_bytes(uart_num, buffer, sizeof(buffer), 0);
-    for(int i=0; i < cnt; i++) 
+    for (int i = 0; i < cnt; i++) 
       cb_push_back(&uartinbuf, &buffer[i]);
 
     char c;
-    while(!cb_pop_front(&uartinbuf, &c)) {
-      
-
-    }
-      if(atcommandlen) {
-        atcommand[atcommandlen++] = buffer[i];                
-
-      } else if (btcommandlen) {
-        btcommand[btcommandlen++] = buffer[i];
-
+    while (!cb_pop_front(&uartinbuf, &c)) {
+      if (atcommandlen >= 0) {
+        atcommand[atcommandlen++] = c;
+        // Check for buffer overflow
+        if(atcommandlen == sizeof(atcommand)-1) {
+          printf("AT Command Buffer Overflow\n");
+          atcommandlen = -1;
+          continue;
+        }
+        // AT Command Termination
+        if(c == '\n') {
+          atcommand[atcommandlen] = '\0';
+          parserATCommand(atcommand);
+          atcommandlen = -1;
+        }
+      } else if (btcommandlen >= 0) {
+        btcommand[btcommandlen++] = c;
+        // Check for buffer overflow
+        if(btcommandlen == sizeof(btcommand)) {
+          printf("BT Data Buffer Overflow\n");
+          btcommandlen = -1;
+          continue;
+        }
+        // BT Command Termination
+        if(c == START_STOP) {
+          parserBTData(btcommand, btcommandlen);
+          btcommandlen = -1;
+        }
       } else {
-        
+        static char lc=0;        
+        if(lc == 'A' && c == 'T') {
+          atcommandlen = 0;
+        }
+        else if(c == START_STOP) {
+          btcommand[0] = START_STOP; // Be sure to include start stop in stream
+          btcommandlen = 1;
+        } 
+        lc = c;
+#ifdef DEBUG        
+        printf(".");        
+#endif        
       }
-
     }
-
-    parseSerialIn(buffer,cnt);
     vTaskDelay(UART_DELAY / portTICK_PERIOD_MS);
   }
 
