@@ -12,10 +12,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-const uint8_t START_STOP    = 0x7E;
-const uint8_t BYTE_STUFF    = 0x7D;
-const uint8_t STUFF_MASK    = 0x20;
-const uint8_t TRAINER_FRAME = 0x80;
+#define START_STOP 0x7E
+#define BYTE_STUFF 0x7D
+#define STUFF_MASK 0x20
+#define BT_CHANNELS 8
+#define BLUETOOTH_LINE_LENGTH           32
+
+extern uint16_t chan_vals[BT_CHANNELS];
+int setTrainer(uint8_t *addr);
 
 /* Attributes State Machine */
 enum
