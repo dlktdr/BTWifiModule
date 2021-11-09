@@ -11,23 +11,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
-#define START_STOP 0x7E
-#define BYTE_STUFF 0x7D
-#define STUFF_MASK 0x20
-#define BT_CHANNELS 8
-#define BLUETOOTH_LINE_LENGTH           32
+#define MAX_BLE_ADDRESSES 20
 
-extern uint16_t chan_vals[BT_CHANNELS];
-int setTrainer(uint8_t *addr);
-
-/* Attributes State Machine */
-enum
-{
-    IDX_SVC,
-    IDX_CHAR_A,
-    IDX_CHAR_VAL_A,
-    IDX_CHAR_CFG_A,
-
-    HRS_IDX_NB,
-};
+extern uint8_t bt_scanned_address_cnt;
+extern char bt_scanned_addresses[MAX_BLE_ADDRESSES][13];
+extern volatile bool bt_scan_complete;
+void bt_init();
+void bt_start_scan();
