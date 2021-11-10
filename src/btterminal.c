@@ -28,17 +28,18 @@ typedef enum {
 } btmode;
 
 typedef enum {
-  CENTRAL_STATE_DISCONNECTED,
+  CENTRAL_STATE_DISCONNECT,
   CENTRAL_STATE_IDLE,
   CENTRAL_STATE_SCAN_START,
   CENTRAL_STATE_SCANNING,
   CENTRAL_STATE_SCAN_COMPLETE,
   CENTRAL_STATE_CONNECT,
+  CENTRAL_STATE_WAITING_CONNECTION,
   CENTRAL_STATE_CONNECTED,
 } btcentralstate;
 
 btmode curMode = BT_MODE_CENTRAL;
-btcentralstate btCentralState = CENTRAL_STATE_DISCONNECTED;
+btcentralstate btCentralState = CENTRAL_STATE_DISCONNECT;
 
 char lcladdress[13] = "806FB0BF6629";
 char rmtaddress[13] = "000000000000";
@@ -49,14 +50,14 @@ inline void sendBTMode()
   if(curMode == BT_MODE_PERIPHERAL) {
     snprintf(reusablebuff, sizeof(reusablebuff), "Peripheral:%s\r\n", lcladdress);
     uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
-  } else if(curMode == BT_MODE_CENTRAL) {    
+  } else if(curMode == BT_MODE_CENTRAL) {
     snprintf(reusablebuff, sizeof(reusablebuff), "Central:%s\r\n", lcladdress);
     uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
   }
 }
 
 void parserATCommand(char atcommand[])
-{  
+{
   // Strip trailing whitespace
   bool done=false;
   while(!done) {
@@ -68,17 +69,17 @@ void parserATCommand(char atcommand[])
   }
 
   if(strncmp(atcommand, "+ROLE0", 6) == 0) {
-    printf("Setting role as Peripheral\n");    
+    printf("Setting role as Peripheral\n");
     curMode = BT_MODE_PERIPHERAL;
-    btCentralState = CENTRAL_STATE_DISCONNECTED;
-    UART_WRITE_STRING(uart_num, "OK+Role:0\r\n");    
+    btCentralState = CENTRAL_STATE_DISCONNECT;
+    UART_WRITE_STRING(uart_num, "OK+Role:0\r\n");
     sendBTMode();
 
   } else if (strncmp(atcommand, "+ROLE1", 6) == 0) {
     printf("Setting role as Central\n");
     curMode = BT_MODE_CENTRAL;
-    btCentralState = CENTRAL_STATE_DISCONNECTED;
-    UART_WRITE_STRING(uart_num, "OK+Role:1\r\n");    
+    btCentralState = CENTRAL_STATE_DISCONNECT;
+    UART_WRITE_STRING(uart_num, "OK+Role:1\r\n");
     sendBTMode();
     // Should auto start discovery here too
 
@@ -91,46 +92,32 @@ void parserATCommand(char atcommand[])
       strcpy(rmtaddress, atcommand + 4);
       // Start connection
       btCentralState = CENTRAL_STATE_CONNECT;
-
-      //  - ON Connection, Send
-      // Connected:<ADDRESS>\r\n
-      // MTU Size:65\r\n
-      // MTU Size: 65\r\n
-
-      // ON Connection to a PARA device
-      //   PHY Update Complete\r\n
-      //   Current PHY: 2M\r\n
-
-      // ON connection to a other device
-      //   Param Update
-
-
-    } else {      
-      UART_WRITE_STRING(uart_num, "ERROR");          
+    } else {
+      UART_WRITE_STRING(uart_num, "ERROR");
     }
 
   } else if (strncmp(atcommand, "+NAME", 5) == 0) {
-    printf("Setting Name to %s\n", atcommand + 5);    
+    printf("Setting Name to %s\n", atcommand + 5);
     snprintf(reusablebuff, sizeof(reusablebuff), "OK+Name:%s\r\n", atcommand +5);
     uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
     sendBTMode();
-    // PARA - Doesn't actually set the name
-    // Bluetooth Trainer Does - (comes in always lowercase)
-    // HERE - follow PARA standards, use Hello as the name
 
   } else if (strncmp(atcommand, "+TXPW", 5) == 0) {
-    printf("Setting Power to %s\n", atcommand + 5);    
+    printf("Setting Power to %s\n", atcommand + 5);
     UART_WRITE_STRING(uart_num, "OK+Txpw:0\r\n");
     sendBTMode();
 
   } else if (strncmp(atcommand, "+DISC?", 6) == 0) {
-    printf("Discovery Requested\n");    
-    UART_WRITE_STRING(uart_num, "OK+DISCS\r\n");    
-    btCentralState = CENTRAL_STATE_SCAN_START;
-
+    if(curMode == BT_MODE_CENTRAL) {
+      printf("Discovery Requested\n");
+      UART_WRITE_STRING(uart_num, "OK+DISCS\r\n");
+      btCentralState = CENTRAL_STATE_SCAN_START;
+    }
   } else if (strncmp(atcommand, "+CLEAR", 6) == 0) {
-    printf("Disconnecting\n");
-    UART_WRITE_STRING(uart_num, "OK+CLEAR\r\n");    
+    if(curMode == BT_MODE_CENTRAL) {
+      btCentralState = CENTRAL_STATE_DISCONNECT;
+      UART_WRITE_STRING(uart_num, "OK+CLEAR\r\n");
+    }
   } else {
     printf("Unknown AT Cmd: %s\n", atcommand);
   }
@@ -141,7 +128,7 @@ void parserATCommand(char atcommand[])
 #define DEBUG
 
 void runUARTHead() {
-  
+
   uart_config_t uart_config = {
       .baud_rate = 115200,
       .data_bits = UART_DATA_8_BITS,
@@ -167,7 +154,7 @@ void runUARTHead() {
 
   circular_buffer uartinbuf;
 
-  cb_init(&uartinbuf, 200);  
+  cb_init(&uartinbuf, 200);
 
   char atcommand[40];
   int atcommandlen=-1;
@@ -175,12 +162,10 @@ void runUARTHead() {
   char btcommand[40];
   int btcommandlen=-1;
 
-  UART_WRITE_STRING(uart_num, "BOOTING\r\n");
-
   while (1) {
     char buffer[50];
     int cnt = uart_read_bytes(uart_num, buffer, sizeof(buffer), 0);
-    for (int i = 0; i < cnt; i++) 
+    for (int i = 0; i < cnt; i++)
       cb_push_back(&uartinbuf, &buffer[i]);
 
     char c;
@@ -213,30 +198,33 @@ void runUARTHead() {
           btcommandlen = -1;
         }
       } else {
-        static char lc=0;        
+        static char lc=0;
         if(lc == 'A' && c == 'T') {
           atcommandlen = 0;
         }
         else if(c == START_STOP) {
           btcommand[0] = START_STOP; // Be sure to include start stop in stream
           btcommandlen = 1;
-        } 
-        lc = c; 
+        }
+        lc = c;
       }
     }
-    
+
     runBT();
     vTaskDelay(1);
   }
 }
+
+
 
 // Handle Scanning/Connecting and Sending Data
 void runBT() {
     static int laddcnt =0;
     if(curMode == BT_MODE_CENTRAL) {
         switch(btCentralState) {
-        case CENTRAL_STATE_DISCONNECTED: {
+        case CENTRAL_STATE_DISCONNECT: {
             // Stop scanning, disconnect from all periferials
+            bt_disconnect();
             break;
         }
         case CENTRAL_STATE_SCAN_START:{
@@ -246,14 +234,15 @@ void runBT() {
             break;
         }
 
-        case CENTRAL_STATE_SCANNING:{            
+        case CENTRAL_STATE_SCANNING:{
             // New item(s) added
             for(int i=laddcnt; i < bt_scanned_address_cnt; i++) {
-                sprintf(reusablebuff, "OK+DISC:%s\r\n", bt_scanned_addresses[i]);
-                uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));                
-                printf("Found BT ADDRESS %s", bt_scanned_addresses[i]);
+              char addr[13];
+              sprintf(reusablebuff, "OK+DISC:%s\r\n",btaddrtostr(addr, bt_scanned_addresses[i]));
+              printf("%s",reusablebuff);
+              uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
             }
-            laddcnt = bt_scanned_address_cnt;  
+            laddcnt = bt_scanned_address_cnt;
             if(bt_scan_complete) {
                 btCentralState = CENTRAL_STATE_SCAN_COMPLETE;
             }
@@ -271,21 +260,21 @@ void runBT() {
 
         // Connection was requested
         case CENTRAL_STATE_CONNECT: {
-            // Pretent we already connected
-            vTaskDelay(40);
-
-            //** DO Properly, Simulating a Bluetooth Connection
-            snprintf(reusablebuff, sizeof(reusablebuff), "Connected:%s\r\n", rmtaddress);
-            uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
-
-            snprintf(reusablebuff, sizeof(reusablebuff), "MTU Size:65\r\nMTU Size: 65\r\nPHY Update Complete\r\nCurrrent PHY: 2M\r\n");
-            uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
-
-            btCentralState = CENTRAL_STATE_CONNECTED;
-
-            // Do nothing, wait for a connection request
-
+            esp_bd_addr_t addr;
+            strtobtaddr(addr, rmtaddress);
+            bt_connect(addr);
+            btCentralState = CENTRAL_STATE_WAITING_CONNECTION;
             break;
+        }
+        case CENTRAL_STATE_WAITING_CONNECTION:{
+          if(bt_connected) {
+            sprintf(reusablebuff, "Connected:%s\r\n", rmtaddress);
+            uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
+            sprintf(reusablebuff, "MTU Size:65\r\nMTU Size: 65\r\nPHT Update Complete\r\nCurrent PHY:2M\r\n");
+            uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
+            btCentralState = CENTRAL_STATE_CONNECTED;
+          }
+          break;
         }
 
         case CENTRAL_STATE_CONNECTED:{
@@ -305,8 +294,8 @@ void runBT() {
             uart_write_bytes(uart_num, (void*)output, len);
             gpio_set_level(GPIO_NUM_22, outbit);
             outbit = !outbit;
-            break;        
+            break;
         }
-        }          
+        }
     }
 }

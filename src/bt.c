@@ -45,16 +45,17 @@
 #define PROFILE_A_APP_ID 0
 #define INVALID_HANDLE   0
 
-static const char remote_device_name[] = "ESP_GATTS_DEMO";
+//static const char remote_device_name[] = "ESP_GATTS_DEMO";
 static bool connect    = false;
 static bool get_server = false;
 static esp_gattc_char_elem_t *char_elem_result   = NULL;
 static esp_gattc_descr_elem_t *descr_elem_result = NULL;
 
 static bool readytoscan = false;
+bool bt_connected = false;
 uint8_t bt_scanned_address_cnt = 0;
 volatile bool bt_scan_complete = true;
-char bt_scanned_addresses[MAX_BLE_ADDRESSES][13];
+esp_bd_addr_t bt_scanned_addresses[MAX_BLE_ADDRESSES];
 
 /* Declare static functions */
 static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
@@ -105,6 +106,30 @@ static struct gattc_profile_inst gl_profile_tab[PROFILE_NUM] = {
     },
 };
 
+void strtobtaddr(esp_bd_addr_t dest, char *src)
+{
+  for(int i=0; i < 6; i++) {
+    char str[3] = "  ";
+    memcpy(str, src, 2);
+    src += 2;
+    dest[i] = strtoul(str,NULL, 16);
+  }
+}
+
+char *btaddrtostr(char dest[13], esp_bd_addr_t src)
+{
+    sprintf(dest, "%02X%02X%02X%02X%02X%02X\r\n",
+            src[0],
+            src[1],
+            src[2],
+            src[3],
+            src[4],
+            src[5]
+        );
+    dest[12] = '\0';
+    return dest;
+}
+
 static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param)
 {
     esp_ble_gattc_cb_param_t *p_data = (esp_ble_gattc_cb_param_t *)param;
@@ -118,6 +143,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         }
         break;
     case ESP_GATTC_CONNECT_EVT:{
+        bt_connected = true;
         ESP_LOGI(GATTC_TAG, "ESP_GATTC_CONNECT_EVT conn_id %d, if %d", p_data->connect.conn_id, gattc_if);
         gl_profile_tab[PROFILE_A_APP_ID].conn_id = p_data->connect.conn_id;
         memcpy(gl_profile_tab[PROFILE_A_APP_ID].remote_bda, p_data->connect.remote_bda, sizeof(esp_bd_addr_t));
@@ -316,6 +342,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         ESP_LOGI(GATTC_TAG, "write char success ");
         break;
     case ESP_GATTC_DISCONNECT_EVT:
+        bt_connected = false;
         connect = false;
         get_server = false;
         ESP_LOGI(GATTC_TAG, "ESP_GATTC_DISCONNECT_EVT, reason = %d", p_data->disconnect.reason);
@@ -327,104 +354,85 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
 
 static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
-    uint8_t *adv_name = NULL;
-    uint8_t adv_name_len = 0;
     switch (event) {
-    case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT: {
-        readytoscan = true;
-        break;
-    }
-    case ESP_GAP_BLE_SCAN_START_COMPLETE_EVT:
-        //scan start complete event to indicate scan start successfully or failed
-        if (param->scan_start_cmpl.status != ESP_BT_STATUS_SUCCESS) {
-            ESP_LOGE(GATTC_TAG, "scan start failed, error status = %x", param->scan_start_cmpl.status);
+        case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT: {
+            readytoscan = true;
             break;
         }
-        ESP_LOGI(GATTC_TAG, "scan start success");
+        case ESP_GAP_BLE_SCAN_START_COMPLETE_EVT: {
+            //scan start complete event to indicate scan start successfully or failed
+            if (param->scan_start_cmpl.status != ESP_BT_STATUS_SUCCESS) {
+                ESP_LOGE(GATTC_TAG, "scan start failed, error status = %x", param->scan_start_cmpl.status);
+                break;
+            }
+            ESP_LOGI(GATTC_TAG, "scan start success");
 
-        break;
-    case ESP_GAP_BLE_SCAN_RESULT_EVT: {
-        esp_ble_gap_cb_param_t *scan_result = (esp_ble_gap_cb_param_t *)param;
-        switch (scan_result->scan_rst.search_evt) {
-        case ESP_GAP_SEARCH_INQ_RES_EVT:
-        if(bt_scanned_address_cnt < MAX_BLE_ADDRESSES) {
-            sprintf(bt_scanned_addresses[bt_scanned_address_cnt], "%02X%02X%02X%02X%02X%02X",
-                scan_result->scan_rst.bda[0],
-                scan_result->scan_rst.bda[1],
-                scan_result->scan_rst.bda[2],
-                scan_result->scan_rst.bda[3],
-                scan_result->scan_rst.bda[4],
-                scan_result->scan_rst.bda[5]
-            );
-            bt_scanned_address_cnt++;
+            break;
         }
-            
-            esp_log_buffer_hex(GATTC_TAG, scan_result->scan_rst.bda, 6);
-            ESP_LOGI(GATTC_TAG, "searched Adv Data Len %d, Scan Response Len %d", scan_result->scan_rst.adv_data_len, scan_result->scan_rst.scan_rsp_len);
-            adv_name = esp_ble_resolve_adv_data(scan_result->scan_rst.ble_adv,
-                                                ESP_BLE_AD_TYPE_NAME_CMPL, &adv_name_len);
-            ESP_LOGI(GATTC_TAG, "searched Device Name Len %d", adv_name_len);
-            esp_log_buffer_char(GATTC_TAG, adv_name, adv_name_len);
-
-#if CONFIG_EXAMPLE_DUMP_ADV_DATA_AND_SCAN_RESP
-            if (scan_result->scan_rst.adv_data_len > 0) {
-                ESP_LOGI(GATTC_TAG, "adv data:");
-                esp_log_buffer_hex(GATTC_TAG, &scan_result->scan_rst.ble_adv[0], scan_result->scan_rst.adv_data_len);
-            }
-            if (scan_result->scan_rst.scan_rsp_len > 0) {
-                ESP_LOGI(GATTC_TAG, "scan resp:");
-                esp_log_buffer_hex(GATTC_TAG, &scan_result->scan_rst.ble_adv[scan_result->scan_rst.adv_data_len], scan_result->scan_rst.scan_rsp_len);
-            }
-#endif
-            ESP_LOGI(GATTC_TAG, "\n");
-
-            if (adv_name != NULL) {
-                if (strlen(remote_device_name) == adv_name_len && strncmp((char *)adv_name, remote_device_name, adv_name_len) == 0) {
-                    ESP_LOGI(GATTC_TAG, "searched device %s\n", remote_device_name);
-                    if (connect == false) {
-                        connect = true;
-                        ESP_LOGI(GATTC_TAG, "connect to the remote device.");
-                        esp_ble_gap_stop_scanning();
-                        esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, scan_result->scan_rst.bda, scan_result->scan_rst.ble_addr_type, true);
+        case ESP_GAP_BLE_SCAN_RESULT_EVT: {
+            esp_ble_gap_cb_param_t *scan_result = (esp_ble_gap_cb_param_t *)param;
+            switch (scan_result->scan_rst.search_evt) {
+            case ESP_GAP_SEARCH_INQ_RES_EVT: {
+                // Add address to the list if it doesn't already exist
+                if(bt_scanned_address_cnt < MAX_BLE_ADDRESSES && scan_result->scan_rst.rssi > MIN_BLE_RSSI) {
+                    bool found=false;
+                    for(int i=0; i < bt_scanned_address_cnt; i++) {
+                        if(memcmp(bt_scanned_addresses[i], scan_result->scan_rst.bda, sizeof(esp_bd_addr_t)) == 0)  {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if(!found) {
+                        memcpy(bt_scanned_addresses[bt_scanned_address_cnt++],
+                        scan_result->scan_rst.bda, sizeof(esp_bd_addr_t));
                     }
                 }
+
+                printf("Found BT Address RSSI=%d, Addr Type=%d\r\n", scan_result->scan_rst.rssi,
+                scan_result->scan_rst.ble_addr_type);
+                break;
+            }
+            case ESP_GAP_SEARCH_INQ_CMPL_EVT: {
+                bt_scan_complete = true;
+                break;
+            }
+            default: {
+                break;
+            }
             }
             break;
-        case ESP_GAP_SEARCH_INQ_CMPL_EVT:
-            break;
-        default:
-            break;
         }
-        break;
-    }
 
-    case ESP_GAP_BLE_SCAN_STOP_COMPLETE_EVT:
-        bt_scan_complete = true;
-        if (param->scan_stop_cmpl.status != ESP_BT_STATUS_SUCCESS){
-            ESP_LOGE(GATTC_TAG, "scan stop failed, error status = %x", param->scan_stop_cmpl.status);
+        case ESP_GAP_BLE_SCAN_STOP_COMPLETE_EVT: {
+            if (param->scan_stop_cmpl.status != ESP_BT_STATUS_SUCCESS){
+                ESP_LOGE(GATTC_TAG, "scan stop failed, error status = %x", param->scan_stop_cmpl.status);
+                break;
+            }
+            ESP_LOGI(GATTC_TAG, "stop scan successfully");
             break;
         }
-        ESP_LOGI(GATTC_TAG, "stop scan successfully");
-        break;
 
-    case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
-        if (param->adv_stop_cmpl.status != ESP_BT_STATUS_SUCCESS){
-            ESP_LOGE(GATTC_TAG, "adv stop failed, error status = %x", param->adv_stop_cmpl.status);
+        case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT: {
+            if (param->adv_stop_cmpl.status != ESP_BT_STATUS_SUCCESS){
+                ESP_LOGE(GATTC_TAG, "adv stop failed, error status = %x", param->adv_stop_cmpl.status);
+                break;
+            }
+            ESP_LOGI(GATTC_TAG, "stop adv successfully");
             break;
         }
-        ESP_LOGI(GATTC_TAG, "stop adv successfully");
-        break;
-    case ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT:
-         ESP_LOGI(GATTC_TAG, "update connection params status = %d, min_int = %d, max_int = %d,conn_int = %d,latency = %d, timeout = %d",
-                  param->update_conn_params.status,
-                  param->update_conn_params.min_int,
-                  param->update_conn_params.max_int,
-                  param->update_conn_params.conn_int,
-                  param->update_conn_params.latency,
-                  param->update_conn_params.timeout);
-        break;
-    default:
-        break;
+        case ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT: {
+            ESP_LOGI(GATTC_TAG, "update connection params status = %d, min_int = %d, max_int = %d,conn_int = %d,latency = %d, timeout = %d",
+                    param->update_conn_params.status,
+                    param->update_conn_params.min_int,
+                    param->update_conn_params.max_int,
+                    param->update_conn_params.conn_int,
+                    param->update_conn_params.latency,
+                    param->update_conn_params.timeout);
+            break;
+        }
+        default: {
+            break;
+        }
     }
 }
 
@@ -459,12 +467,29 @@ static void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp
 
 void bt_start_scan()
 {
-    if(!readytoscan)
+    if(!readytoscan) {
         return;
+    }
     bt_scan_complete = false;
     bt_scanned_address_cnt = 0;
-    uint32_t duration = 5;
+    printf("Clearing Addresses\r\n");
+    uint32_t duration = 1;
     esp_ble_gap_start_scanning(duration);
+}
+
+void bt_connect(esp_bd_addr_t addr)
+{
+    char saddr[13];
+    printf("Connecting to %s\r\n", btaddrtostr(saddr,addr));
+    esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, addr, BLE_ADDR_TYPE_RANDOM, true);
+}
+
+void bt_disconnect()
+{
+    if(bt_connected)
+        esp_ble_gattc_close(gl_profile_tab[PROFILE_A_APP_ID].gattc_if,
+                            gl_profile_tab[PROFILE_A_APP_ID].conn_id);
+    bt_connected = false;
 }
 
 void bt_init()
