@@ -3,7 +3,7 @@ Frsky Bluetooth Emulator
 
 This code is for use on a ESP Wroom 32, it emulates a FRSky Bluetooth modulw but with way more power and possibilities.
 
-Not functinaly yet, can read AT commands and Data from the Radio.
+Update: Nov 9. Now can scan/connect/disconnect to a remote BLE device in Master/Bluetooth Mode. Still sends out simulated data on connection.
 
 On the ideas list.. 
 -----------------
