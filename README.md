@@ -15,6 +15,7 @@ To Do (Plan is to work top down)
 - [ ] Wifi Mode Selection (Extra AT commands including settings) (Access Point / Device / Ad-Hoc)
    - Wifi Modes
      - Trainer Not sure on a good mode here yet, probably not infrastructure mode tho, point to point maybe in 11b LR mode. 
+       **EDIT:** I think ESPnow is a perfect solution, point to point and still works in LR mode.
      - Telemetry
      - Mavlink Router (Eventually, with radio support)
 - [ ] OTA Firmware updates for ESP (In AP mode via HTTP server)
