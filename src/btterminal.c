@@ -6,6 +6,7 @@
 #include "frskybt.h"
 #include "cb.h"
 #include "bt.h"
+#include "defines.h"
 
 void runBT();
 
@@ -18,7 +19,7 @@ void parserBTData(const char btdata[], int len)
   printf("\n");
 }
 
-const uart_port_t uart_num = UART_NUM_2;
+const uart_port_t uart_num = UART_NUM;
 
 #define UART_WRITE_STRING(x,y) uart_write_bytes(x, y, sizeof(y)-1)
 
@@ -142,7 +143,7 @@ void runUARTHead() {
   ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
 
   ESP_ERROR_CHECK(
-      uart_set_pin(uart_num, 4, 5, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+      uart_set_pin(uart_num, UART_TXPIN, UART_RXPIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
   // Setup UART buffered IO with event queue
   const int uart_buffer_size = (1024 * 2);
