@@ -42,6 +42,7 @@ typedef enum {
 btmode curMode = BT_MODE_CENTRAL;
 btcentralstate btCentralState = CENTRAL_STATE_DISCONNECT;
 
+int laddcnt = 0;
 char lcladdress[13] = "806FB0BF6629";
 char rmtaddress[13] = "000000000000";
 char reusablebuff[200];
@@ -112,7 +113,9 @@ void parserATCommand(char atcommand[])
     if(curMode == BT_MODE_CENTRAL) {
       printf("Discovery Requested\n");
       UART_WRITE_STRING(uart_num, "OK+DISCS\r\n");
-      btCentralState = CENTRAL_STATE_SCAN_START;
+      laddcnt = 0;
+      if(btCentralState != CENTRAL_STATE_SCAN_START)
+        btCentralState = CENTRAL_STATE_SCAN_START;
     }
   } else if (strncmp(atcommand, "+CLEAR", 6) == 0) {
     if(curMode == BT_MODE_CENTRAL) {
@@ -162,6 +165,8 @@ void runUARTHead() {
 
   char btcommand[40];
   int btcommandlen=-1;
+
+  uart_write_bytes(uart_num, "ASDF\r\n",6);
 
   while (1) {
     char buffer[50];
@@ -216,11 +221,8 @@ void runUARTHead() {
   }
 }
 
-
-
 // Handle Scanning/Connecting and Sending Data
 void runBT() {
-    static int laddcnt =0;
     if(curMode == BT_MODE_CENTRAL) {
         switch(btCentralState) {
         case CENTRAL_STATE_DISCONNECT: {
@@ -279,7 +281,7 @@ void runBT() {
         }
 
         case CENTRAL_STATE_CONNECTED:{
-            // Reset all channels to center
+        /*    // Reset all channels to center
             for(int i=0; i < BT_CHANNELS; i++) {
             chan_vals[i] = 1500;
             }
@@ -295,7 +297,7 @@ void runBT() {
             uart_write_bytes(uart_num, (void*)output, len);
             gpio_set_level(GPIO_NUM_22, outbit);
             outbit = !outbit;
-            break;
+            break;*/
         }
         }
     }

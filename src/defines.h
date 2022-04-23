@@ -1,5 +1,5 @@
 #if PCB==PICO
-#define LEDPIN 4
+//#define LEDPIN 6
 #define UART_NUM UART_NUM_2
 #define UART_TXPIN 4
 #define UART_RXPIN 5
@@ -11,3 +11,6 @@
 #error "DEFINES.h not Configured"
 
 #endif
+
+#include <driver/uart.h>
+extern const uart_port_t uart_num;

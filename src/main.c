@@ -27,25 +27,32 @@
 #include "btterminal.h"
 #include "nvs_flash.h"
 #include "bt.h"
+//#include "wifi/wifi.h"
+#include "defines.h"
 
+#if defined(LEDPIN)
 void runBlinky() {
-  gpio_set_direction(GPIO_NUM_33, GPIO_MODE_DEF_OUTPUT);
+  gpio_set_direction(LEDPIN, GPIO_MODE_DEF_OUTPUT);
   while (1) {
-    gpio_set_level(GPIO_NUM_33, 0);
+    gpio_set_level(LEDPIN, 0);
     vTaskDelay(pdMS_TO_TICKS(100));
-    gpio_set_level(GPIO_NUM_33, 1);
+    gpio_set_level(LEDPIN, 1);
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
+#endif
 
 void app_main(void) {
-  TaskHandle_t tBlinkHnd = NULL;
-  TaskHandle_t tUartHnd = NULL;
-  xTaskCreate(runBlinky, "Blinky", 1024, NULL, tskIDLE_PRIORITY, &tBlinkHnd);
-  configASSERT(tBlinkHnd);
 
+  TaskHandle_t tUartHnd = NULL;
   xTaskCreate(runUARTHead, "Uart2", 8192, NULL, tskIDLE_PRIORITY + 1, &tUartHnd);
   configASSERT(tUartHnd);
+
+#if defined(LEDPIN)
+  TaskHandle_t tBlinkHnd = NULL;
+  xTaskCreate(runBlinky, "Blinky", 1024, NULL, tskIDLE_PRIORITY, &tBlinkHnd);
+  configASSERT(tBlinkHnd);
+#endif
 
   esp_err_t ret;
 
@@ -59,4 +66,6 @@ void app_main(void) {
   ESP_ERROR_CHECK(ret);
 
   bt_init();
+
+  //wifi_init_softap();
 }
