@@ -1,17 +1,25 @@
-#if PCB==PICO
+#if defined(PCB_PICO)
 //#define LEDPIN 6
 #define UART_NUM UART_NUM_2
 #define UART_TXPIN 4
 #define UART_RXPIN 5
 
-#elif PCB==C3MINI
-#error "DEFINES.h not Configured"
+#elif defined(PCB_WROOM)
 
-#elif PCB==WROOM
+#define UART_NUM UART_NUM_2
+#define UART_TXPIN 18
+#define UART_RXPIN 19
+
+#elif defined(PCB_C3MINI)
+
 #define UART_NUM UART_NUM_2
 #define UART_TXPIN 18
 #define UART_RXPIN 19
 //#define LEDPIN 6
+
+#else
+
+#error "DEFINES.h not Configured"
 
 #endif
 
