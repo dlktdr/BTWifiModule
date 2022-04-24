@@ -8,7 +8,10 @@
 #error "DEFINES.h not Configured"
 
 #elif PCB==WROOM
-#error "DEFINES.h not Configured"
+#define UART_NUM UART_NUM_2
+#define UART_TXPIN 18
+#define UART_RXPIN 19
+//#define LEDPIN 6
 
 #endif
 

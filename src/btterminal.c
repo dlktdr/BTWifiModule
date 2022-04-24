@@ -166,8 +166,6 @@ void runUARTHead() {
   char btcommand[40];
   int btcommandlen=-1;
 
-  uart_write_bytes(uart_num, "ASDF\r\n",6);
-
   while (1) {
     char buffer[50];
     int cnt = uart_read_bytes(uart_num, buffer, sizeof(buffer), 0);
