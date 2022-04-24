@@ -1,15 +1,17 @@
 # BTWifiModule
-Frsky Bluetooth Emulator (To Start)
+Frsky Bluetooth Emulator
 
 This code is for use on a ESP Wroom 32, it emulates a FRSky Bluetooth modulw but with way more power and possibilities.
 
-Update: Nov 9. Now can scan/connect/disconnect to a remote BLE device in Master/Bluetooth Mode. Still sends out simulated data on connection.
+Update: 
+Nov 9.Now can scan/connect/disconnect to a remote BLE device in Master/Bluetooth Mode. Still sends out simulated data on connection.
+Apr 23 BT now works in Master Trainer Mode
 
 To Do (Plan is to work top down)
 ---------
 - [x] At Modem Command Set to Radio via UART
 - [x] Bluetooth Master/Bluetooth Scan and Device Connection
-- [ ] Bluetooth Trainer Receiver (Master / Bluetooth)
+- [x] Bluetooth Trainer Receiver (Master / Bluetooth)
 - [ ] Bluetooth Trainer Transmitter (Slave / Bluetooth)
 - [ ] Bluetooth Telewmetery Transmitter
 - [ ] Wifi Mode Selection (Extra AT commands including settings) (Access Point / Device / Ad-Hoc)
