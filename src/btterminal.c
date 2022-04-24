@@ -279,23 +279,9 @@ void runBT() {
         }
 
         case CENTRAL_STATE_CONNECTED:{
-        /*    // Reset all channels to center
-            for(int i=0; i < BT_CHANNELS; i++) {
-            chan_vals[i] = 1500;
-            }
-
-            // TEMP...
-            static float val=0;
-            static bool outbit=0;
-            val+=0.01;
-            float sinwave = 500*sin(val) + 1500;
-            chan_vals[0] = sinwave;
-            uint8_t output[BLUETOOTH_LINE_LENGTH+1];
-            int len = setTrainer(output);
-            uart_write_bytes(uart_num, (void*)output, len);
-            gpio_set_level(GPIO_NUM_22, outbit);
-            outbit = !outbit;
-            break;*/
+          if(!bt_connected) { // Connection Lost
+            btCentralState = CENTRAL_STATE_CONNECT;
+          }
         }
         }
     }

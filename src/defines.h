@@ -19,7 +19,7 @@
 
 #else
 
-#error "DEFINES.h not Configured"
+#error "PCB NOT Configured"
 
 #endif
 
