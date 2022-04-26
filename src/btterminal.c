@@ -124,6 +124,16 @@ void parserATCommand(char atcommand[])
       btCentralState = CENTRAL_STATE_DISCONNECT;
       UART_WRITE_STRING(uart_num, "OK+CLEAR\r\n");
     }
+
+  } else if (strncmp(atcommand, "+HTRESET", 8) == 0) {
+    if(bt_board_type == BLE_BOARD_HEADTRACKER) {
+      printf("Restting Head Tracker Board\r\n");
+      UART_WRITE_STRING(uart_num, "OK+HTRESET\r\n");
+      bt_dohtreset();
+    } else {
+      UART_WRITE_STRING(uart_num, "ERROR");
+    }
+
   } else {
     printf("Unknown AT Cmd: %s\n", atcommand);
   }
