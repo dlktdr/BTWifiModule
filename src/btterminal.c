@@ -252,7 +252,7 @@ void runBT() {
             for(int i=laddcnt; i < bt_scanned_address_cnt; i++) {
               char addr[13];
               sprintf(reusablebuff, "OK+DISC:%s\r\n",btaddrtostr(addr, bt_scanned_addresses[i]));
-              printf("%s",reusablebuff);
+              //printf("%s",reusablebuff);
               uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
             }
             laddcnt = bt_scanned_address_cnt;
@@ -280,12 +280,20 @@ void runBT() {
             break;
         }
         case CENTRAL_STATE_WAITING_CONNECTION:{
-          if(bt_connected) {
-            sprintf(reusablebuff, "Connected:%s\r\n", rmtaddress);
-            uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
-            sprintf(reusablebuff, "MTU Size:65\r\nMTU Size: 65\r\nPHT Update Complete\r\nCurrent PHY:2M\r\n");
-            uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
-            btCentralState = CENTRAL_STATE_CONNECTED;
+          if(bt_scan_complete) {
+            if(bt_validslavefound) {
+              sprintf(reusablebuff, "Connected:%s\r\n", rmtaddress);
+              uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
+              sprintf(reusablebuff, "MTU Size:65\r\nMTU Size: 65\r\nPHT Update Complete\r\nCurrent PHY:2M\r\n"); //Fixme
+              uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
+              sprintf(reusablebuff, "Board:%s\r\n", str_ble_board_types[bt_board_type]);
+              uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));           
+              btCentralState = CENTRAL_STATE_CONNECTED;
+              // TODO: Add 
+
+            } else {
+              btCentralState = CENTRAL_STATE_DISCONNECT;
+            }
           }
           break;
         }

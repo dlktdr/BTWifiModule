@@ -43,21 +43,28 @@
 
 #define GATTC_TAG "BTWIFI"
 #define REMOTE_SERVICE_UUID        0xFFF0
-#define REMOTE_NOTIFY_CHAR_UUID    0xFFF6
+#define REMOTE_FRSKY_CHAR_UUID     0xFFF6
+#define REMOTE_HTRESET_CHAR_UUID   0xAFF2
 #define PROFILE_NUM      1
 #define PROFILE_A_APP_ID 0
 #define INVALID_HANDLE   0
 
-//static const char remote_device_name[] = "ESP_GATTS_DEMO";
-static bool connect    = false;
+char *str_ble_board_types[BLE_BOARD_COUNT] = {"Unknown","CC2540","PARA","HeadTracker","FlySky"};
+
 static bool get_server = false;
 static esp_gattc_char_elem_t *char_elem_result   = NULL;
 static esp_gattc_descr_elem_t *descr_elem_result = NULL;
 
 static bool readytoscan = false;
-bool bt_connected = false;
 uint8_t bt_scanned_address_cnt = 0;
+volatile bool bt_validslavefound = false;
+volatile bool bt_connected = false;
 volatile bool bt_scan_complete = true;
+volatile ble_board_type bt_board_type = BLE_BOARD_UNKNOWN;
+volatile bool ht_reset = false;
+uint16_t bt_datahandle;
+uint16_t bt_htresethandle;
+
 esp_bd_addr_t bt_scanned_addresses[MAX_BLE_ADDRESSES];
 
 /* Declare static functions */
@@ -69,11 +76,6 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
 static esp_bt_uuid_t remote_filter_service_uuid = {
     .len = ESP_UUID_LEN_16,
     .uuid = {.uuid16 = REMOTE_SERVICE_UUID,},
-};
-
-static esp_bt_uuid_t remote_filter_char_uuid = {
-    .len = ESP_UUID_LEN_16,
-    .uuid = {.uuid16 = REMOTE_NOTIFY_CHAR_UUID,},
 };
 
 static esp_bt_uuid_t notify_descr_uuid = {
@@ -158,6 +160,8 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         if (mtu_ret){
             ESP_LOGE(GATTC_TAG, "config MTU error, error code = %x", mtu_ret);
         }
+
+        bt_scan_complete = false;
         ESP_LOGI(GATTC_TAG, "Starting Service Scan");
         esp_ble_gattc_search_service(gattc_if, param->cfg_mtu.conn_id, &remote_filter_service_uuid);
 
@@ -225,27 +229,48 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
             ESP_LOGI(GATTC_TAG, "Attr Count %d", count);  
 
             if (count > 0){
-                char_elem_result = (esp_gattc_char_elem_t *)malloc(sizeof(esp_gattc_char_elem_t) * count);
+                char_elem_result = (esp_gattc_char_elem_t *)malloc(sizeof(esp_gattc_char_elem_t) * MAX_CHAR_TO_SCAN);
                 if (!char_elem_result){
                     ESP_LOGE(GATTC_TAG, "gattc no mem");
                 } else {
-                    status = esp_ble_gattc_get_char_by_uuid( gattc_if,
-                                                             p_data->search_cmpl.conn_id,
-                                                             gl_profile_tab[PROFILE_A_APP_ID].service_start_handle,
-                                                             gl_profile_tab[PROFILE_A_APP_ID].service_end_handle,
-                                                             remote_filter_char_uuid,
-                                                             char_elem_result,
-                                                             &count);
+                    count = MAX_CHAR_TO_SCAN;
+                    status = esp_ble_gattc_get_all_char ( gattc_if,
+                                                          p_data->search_cmpl.conn_id,
+                                                          gl_profile_tab[PROFILE_A_APP_ID].service_start_handle,
+                                                          gl_profile_tab[PROFILE_A_APP_ID].service_end_handle,
+                                                          char_elem_result,
+                                                          &count,
+                                                          0 );
                     if (status != ESP_GATT_OK){
-                        ESP_LOGE(GATTC_TAG, "esp_ble_gattc_get_char_by_uuid error");
+                        ESP_LOGE(GATTC_TAG, "esp_ble_gattc_get_all_char error");
                     }
 
-                    /*  Every service have only one char in our 'ESP_GATTS_DEMO' demo, so we used first 'char_elem_result' */
-                    if (count > 0 && (char_elem_result[0].properties & ESP_GATT_CHAR_PROP_BIT_NOTIFY)){
-                        gl_profile_tab[PROFILE_A_APP_ID].char_handle = char_elem_result[0].char_handle;
-                        esp_ble_gattc_register_for_notify (gattc_if, gl_profile_tab[PROFILE_A_APP_ID].remote_bda, char_elem_result[0].char_handle);
+                    bt_validslavefound = false;
+                    bt_board_type = BLE_BOARD_UNKNOWN;
+                    for(int i=0; i < count; i++) {
+                        if(char_elem_result[i].uuid.uuid.uuid16 == 0xFFF6) {
+                            bt_validslavefound = true;
+                            bt_datahandle = char_elem_result[i].char_handle;
+                            ESP_LOGI(GATTC_TAG, "Found the Trainer Characteristic");
+                            if(char_elem_result[i].properties & ESP_GATT_CHAR_PROP_BIT_NOTIFY) {
+                                // Subscribing to the Notify
+                                ESP_LOGI(GATTC_TAG, "Subscribing for Notifications");
+                                gl_profile_tab[PROFILE_A_APP_ID].char_handle = char_elem_result[i].char_handle;
+                                esp_ble_gattc_register_for_notify (gattc_if, gl_profile_tab[PROFILE_A_APP_ID].remote_bda, char_elem_result[i].char_handle);
+                            } 
+                            
+                        } else if (char_elem_result[i].uuid.uuid.uuid16 == 0xAFF2) {
+                            ESP_LOGI(GATTC_TAG, "Found the reset characteristic. This is a headtracker board");
+                            bt_board_type = BLE_BOARD_HEADTRACKER;
+                            bt_htresethandle = char_elem_result[i].char_handle;
+
+                         
+                        } else if (char_elem_result[i].uuid.uuid.uuid16 == 0xAFF1) {
+                            ESP_LOGI(GATTC_TAG, "Found the valid channels. This is a headtracker board");
+                            bt_board_type = BLE_BOARD_HEADTRACKER;
+                        }
                     }
-                    
+                    bt_scan_complete = true;
                 }
                 /* free char_elem_result */
                 free(char_elem_result);
@@ -313,13 +338,14 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
     }
     case ESP_GATTC_NOTIFY_EVT:
         if (p_data->notify.is_notify) {
-            // ESP_LOGI(GATTC_TAG, "ESP_GATTC_NOTIFY_EVT, receive notify value:");
-            uart_write_bytes(uart_num, (void*)p_data->notify.value, p_data->notify.value_len);
-        }else{
+           // if(p_data->notify.handle == bt_datahandle) // If notify coming from the data handle, send it to the UART port
+              uart_write_bytes(uart_num, (void*)p_data->notify.value, p_data->notify.value_len);
+          //  else 
+          //    ESP_LOGI(GATTC_TAG, "ESP_GATTC_NOTIFY_EVT, receive unknown notify value:");
+        } else {
             ESP_LOGI(GATTC_TAG, "ESP_GATTC_NOTIFY_EVT, receive indicate value:");
         }
-        
-        //esp_log_buffer_hex(GATTC_TAG, p_data->notify.value, p_data->notify.value_len);
+
         break;
     case ESP_GATTC_WRITE_DESCR_EVT:
         if (p_data->write.status != ESP_GATT_OK){
@@ -356,7 +382,6 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         break;
     case ESP_GATTC_DISCONNECT_EVT:
         bt_connected = false;
-        connect = false;
         get_server = false;
         ESP_LOGI(GATTC_TAG, "ESP_GATTC_DISCONNECT_EVT, reason = %d", p_data->disconnect.reason);
         break;
@@ -478,6 +503,23 @@ static void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp
     } while (0);
 }
 
+void bt_dohtreset()
+{
+    if(bt_connected && bt_scan_complete && bt_board_type == BLE_BOARD_HEADTRACKER) {
+        esp_err_t status;
+        status = esp_ble_gattc_write_char(gl_profile_tab[PROFILE_A_APP_ID].gattc_if,
+                                            gl_profile_tab[PROFILE_A_APP_ID].conn_id,
+                                            bt_htresethandle,
+                                            1,
+                                            (uint8_t*)"R",
+                                            ESP_GATT_WRITE_TYPE_NO_RSP,
+                                            ESP_GATT_AUTH_REQ_NONE);
+        if(status != ESP_OK) {
+            printf("Error Writing to Characteristic");
+        }
+    }
+}
+
 void bt_start_scan()
 {
     if(!readytoscan) {
@@ -492,6 +534,9 @@ void bt_start_scan()
 
 void bt_connect(esp_bd_addr_t addr)
 {
+    if(bt_connected) return;
+    bt_scan_complete = false;
+    bt_validslavefound = false;
     char saddr[13];
     printf("Connecting to %s\r\n", btaddrtostr(saddr,addr));
     esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, addr, BLE_ADDR_TYPE_RANDOM, true);
@@ -503,6 +548,8 @@ void bt_disconnect()
         esp_ble_gattc_close(gl_profile_tab[PROFILE_A_APP_ID].gattc_if,
                             gl_profile_tab[PROFILE_A_APP_ID].conn_id);
     bt_connected = false;
+    bt_scan_complete = false;
+    bt_validslavefound = false;
 }
 
 void bt_init()
