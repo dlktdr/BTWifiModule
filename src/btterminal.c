@@ -114,9 +114,11 @@ void parserATCommand(char atcommand[])
       printf("Discovery Requested\n");
       UART_WRITE_STRING(uart_num, "OK+DISCS\r\n");
       laddcnt = 0;
-      if(btCentralState != CENTRAL_STATE_SCAN_START)
+      if(btCentralState != CENTRAL_STATE_SCAN_START && 
+         btCentralState != CENTRAL_STATE_SCANNING)
         btCentralState = CENTRAL_STATE_SCAN_START;
     }
+
   } else if (strncmp(atcommand, "+CLEAR", 6) == 0) {
     if(curMode == BT_MODE_CENTRAL) {
       btCentralState = CENTRAL_STATE_DISCONNECT;
