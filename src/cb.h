@@ -16,9 +16,10 @@ typedef struct circular_buffer
 void cb_init(circular_buffer *cb, size_t capacity)
 {
     cb->buffer = malloc(capacity);
-    if(cb->buffer == NULL)
-        // handle error
-    cb->buffer_end = (char *)cb->buffer + capacity;
+    if(cb->buffer == NULL) {
+        // TODO: handle error
+    }
+    cb->buffer_end = cb->buffer + capacity;
     cb->capacity = capacity;
     cb->count = 0;
     cb->head = cb->buffer;
@@ -37,7 +38,7 @@ int cb_push_back(circular_buffer *cb, char *item)
 
     *cb->head = *item;
 
-    cb->head = (char*)cb->head + 1;
+    cb->head++;
     if(cb->head == cb->buffer_end)
         cb->head = cb->buffer;
     cb->count++;
@@ -51,7 +52,7 @@ int cb_pop_front(circular_buffer *cb, char *item)
     }
     *item = *cb->tail;
 
-    cb->tail = (char*)cb->tail + 1;
+    cb->tail++;
     if(cb->tail == cb->buffer_end)
         cb->tail = cb->buffer;
     cb->count--;
