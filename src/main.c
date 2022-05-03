@@ -24,16 +24,18 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
-#include "btterminal.h"
+#include "terminal.h"
 #include "nvs_flash.h"
 #include "bt.h"
-//#include "wifi/wifi.h"
 #include "defines.h"
+#include "settings.h"
+
+nvs_handle_t nvs_flsh_btw;
 
 #if defined(LEDPIN)
 void runBlinky() {
   gpio_set_direction(LEDPIN, GPIO_MODE_DEF_OUTPUT);
-  while (1) {
+  for(;;) {
     gpio_set_level(LEDPIN, 0);
     vTaskDelay(pdMS_TO_TICKS(100));
     gpio_set_level(LEDPIN, 1);
@@ -42,10 +44,11 @@ void runBlinky() {
 }
 #endif
 
+
 void app_main(void) {
 
   TaskHandle_t tUartHnd = NULL;
-  xTaskCreate(runUARTHead, "Uart2", 8192, NULL, tskIDLE_PRIORITY + 1, &tUartHnd);
+  xTaskCreate(runUARTHead, "UART", 4096, NULL, tskIDLE_PRIORITY+2, &tUartHnd);
   configASSERT(tUartHnd);
 
 #if defined(LEDPIN)
@@ -65,7 +68,9 @@ void app_main(void) {
   }
   ESP_ERROR_CHECK(ret);
 
-  bt_init();
+  ESP_ERROR_CHECK(nvs_open("btwifi",NVS_READWRITE, &nvs_flsh_btw));
+  
+  loadSettings();
 
-  //wifi_init_softap();
+  bt_init();
 }
