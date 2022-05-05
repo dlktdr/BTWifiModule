@@ -4,7 +4,9 @@
 
 #define LOG_SET "SETTINGS"
 
-void _loadSettings(settings_t* set);
+#define NVS_STRUCT_KEY "skey"
+
+void _loadSettings(settings_t *set);
 
 settings_t settings = {
   .role = ROLE_UNKNOWN  
@@ -16,15 +18,16 @@ volatile bool settings_ok = false;
 void saveSettings()
 {
   settings_t flashsettings;
-  loadSettings(&flashsettings);
+  _loadSettings(&flashsettings);
 
   if(!memcmp((void*)&flashsettings, (void*)&settings, sizeof(settings_t))) {
     ESP_LOGI(LOG_SET, "No data differs, not writing to flash");
+    return;
   } else {
     ESP_LOGI(LOG_SET, "Data is different, FR=%d, MR=%d", flashsettings.role, settings.role);
   }
 
-  esp_err_t err = nvs_set_blob(nvs_flsh_btw, "settings", (void *)&settings, sizeof(settings_t));
+  esp_err_t err = nvs_set_blob(nvs_flsh_btw, NVS_STRUCT_KEY, (void *)&settings, sizeof(settings_t));
   if(err == ESP_OK) {
     ESP_LOGI(LOG_SET, "Blob store success");
   } else {
@@ -42,7 +45,7 @@ void _loadSettings(settings_t *s)
 {
   ESP_LOGI(LOG_SET,"Reading settings");
   size_t length = sizeof(settings_t);
-  esp_err_t ret = nvs_get_blob(nvs_flsh_btw, "settings", (void*)s, &length);
+  esp_err_t ret = nvs_get_blob(nvs_flsh_btw, NVS_STRUCT_KEY, (void*)s, &length);
   if(ret == ESP_OK && length == sizeof(settings_t)) {
     ESP_LOGI(LOG_SET, "Settings Read Successfully");    
     return;
@@ -54,7 +57,7 @@ void _loadSettings(settings_t *s)
     }
   }
   // Settings invalid, clear the memory
-  memset(&settings, 0, sizeof(settings_t));
+  memset(s, 0, sizeof(settings_t));
 }
 
 void loadSettings()
@@ -62,6 +65,6 @@ void loadSettings()
   // Load settings into global settings struct.
   _loadSettings(&settings);
   
-  // Will be filled properly here or null
+  // Will be filled properly here or nulled out
   settings_ok = true;
 }
