@@ -1,3 +1,5 @@
+#pragma once
+
 #include "esp_bt_defs.h"
 
 extern esp_bd_addr_t rmtbtaddress;

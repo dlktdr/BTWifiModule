@@ -6,9 +6,14 @@
 
 #define START_STOP 0x7E
 #define BYTE_STUFF 0x7D
+#define TRAINER_FRAME 0x80
 #define STUFF_MASK 0x20
 #define BT_CHANNELS 8
-#define BLUETOOTH_LINE_LENGTH           32
 
-extern uint16_t chan_vals[BT_CHANNELS];
-int setTrainer(uint8_t *addr);
+enum {
+  BT_CRC_FAULT=-1,
+  BT_SUCCESS=0,
+};
+
+int setTrainer(uint8_t *addr, uint16_t chan_vals[BT_CHANNELS]);
+int processTrainer(const char *data, int len, uint16_t channels[BT_CHANNELS]);

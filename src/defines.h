@@ -1,5 +1,7 @@
 #pragma once
 
+#define DEBUG
+
 #if defined(PCB_PICO)
 //#define LEDPIN 6
 #define UART_NUM UART_NUM_2
@@ -27,13 +29,18 @@
 
 #define BAUD_RESET_TIMER 1000000 // us
 #define BAUD_DEFAULT 115200
-#define BAUD_MAXIMUM 1000000
+#define BAUD_MAXIMUM 921600 
+
+// Optional Debugging Options
+#define DEBUG_TIMERS
+
+#define LEN_BLUETOOTH_NAME 10
 
 #include <driver/uart.h>
 extern const uart_port_t uart_num;
 
 typedef enum {
-  ROLE_UNKNOWN,
+  ROLE_UNKNOWN=0,
   ROLE_BLE_PERIPHERAL,
   ROLE_BLE_CENTRAL,
   ROLE_ESPNOW_PERIPHERAL,

@@ -41,7 +41,6 @@ typedef enum {
 
 typedef enum {
   PERIPHERIAL_STATE_DISCONNECTED,
-  PERIPHERIAL_STATE_CONNECTING,
   PERIPHERIAL_STATE_CONNECTED,
 } btperipheralstate;
 
@@ -67,11 +66,25 @@ void sendBTMode()
 
 void parserBTData(const char btdata[], int len)
 {
- /* printf("BT DATA: ");
-  for(int i=0; i < len; i++) {
-    printf("%x ", btdata[i]);
+  static int64_t ltime =0;
+  int64_t timestamp = esp_timer_get_time() - ltime;  
+  ltime = esp_timer_get_time();
+  uint16_t channeldata[8];
+  if(processTrainer(btdata, len, channeldata)) {
+    ESP_LOGE(LOG_UART, "(%05lld)[%02d] Unable to decode data", timestamp,len);
+  } else {
+    ESP_LOGI(LOG_UART, "(%05lld)[%02d] Ch0[%04d] Ch1[%04d] Ch2[%04d] Ch3[%04d] Ch4[%04d] Ch5[%04d] Ch6[%04d] Ch7[%04d]", 
+                     timestamp,
+                     len,
+                     channeldata[0],
+                     channeldata[1],
+                     channeldata[2],
+                     channeldata[3],
+                     channeldata[4],
+                     channeldata[5],
+                     channeldata[6],
+                     channeldata[7]);
   }
-  printf("\n");*/
 }
 
 void parserATCommand(char atcommand[])
@@ -172,8 +185,6 @@ void parserATCommand(char atcommand[])
 }
 
 // Ticks to wait for data stream to come in
-#define UART_DELAY 10
-#define DEBUG
 
 uart_config_t uart_config = {
     .baud_rate = BAUD_DEFAULT,
@@ -197,9 +208,7 @@ int atcommandlen=-1;
 char btcommand[BT_CMD_MAX_LEN];
 int btcommandlen=-1;
 
-  circular_buffer uartinbuf;
-  
-
+circular_buffer uartinbuf;
 
 void runUARTHead() {
 
@@ -218,8 +227,8 @@ void runUARTHead() {
   while(!settings_ok) {vTaskDelay(50);}; // Pause until settings are read
   ESP_LOGI(LOG_UART, "Setting initial role");
   if(settings.role == ROLE_UNKNOWN) {
-    ESP_LOGE(LOG_UART, "Invalid role loaded, defaulting to peripheral");
-    settings.role = ROLE_BLE_PERIPHERAL;
+    ESP_LOGE(LOG_UART, "Invalid role loaded, defaulting to central");
+    settings.role = ROLE_BLE_CENTRAL;
   }
   setRole(settings.role);
 
@@ -231,9 +240,6 @@ void runUARTHead() {
 
   while (1) {
     int cnt = uart_read_bytes(uart_num, data, UART_RX_BUFFER, 0);
-    if(cnt > 0) {
-      printf("C:%d\n",cnt);
-    }
     for (int i = 0; i < cnt; i++)
       cb_push_back(&uartinbuf, &data[i]);
 
@@ -289,6 +295,7 @@ void runUARTHead() {
 
 void setRole(role_t role)
 {
+  ESP_LOGI(LOG_UART,"Switching from mode %d to %d", curMode, role);
   if(role == curMode) return;
 
   // Shutdown
@@ -310,10 +317,12 @@ void setRole(role_t role)
   switch(curMode) {
     case ROLE_BLE_CENTRAL:
       btCentralState = CENTRAL_STATE_DISCONNECT;
+      bt_init();
       btcInit();
       break;
     case ROLE_BLE_PERIPHERAL:
       btPeripherialState = PERIPHERIAL_STATE_DISCONNECTED;
+      bt_init();
       btpInit(); 
       break;
     case ROLE_BTEDR_AUDIO_SOURCE:
@@ -321,6 +330,8 @@ void setRole(role_t role)
 
       // Baud rate check to make sure we are at a higher rate of at least xxx
       // for 44.1khz 16bit, 1ch |  44,100 x 16 x 1 = 1,411,200 | 1411200/8 = 176,400 B/s + Some Bytestuffing for AT commands.
+      // Probably need 2Mbaud.... or reduce audio quality
+
       break;
     default:
       break;
@@ -370,7 +381,7 @@ void runBTCentral()
       //esp_bd_addr_t btaddr;
       //if(!readBTAddress(btaddr)) {
       //  btCentralState = CENTRAL_STATE_CONNECT;
-      //}
+      //}  
       // Do Nothing
       break;
     }
@@ -422,12 +433,10 @@ void runBTPeripherial()
           btPeripherialState = PERIPHERIAL_STATE_CONNECTED;
       }
       break;
-    case PERIPHERIAL_STATE_CONNECTING:
-      break;
     case PERIPHERIAL_STATE_CONNECTED:
       if(!btp_connected) {
         btPeripherialState = PERIPHERIAL_STATE_DISCONNECTED;
-        uart_write_bytes(uart_num, "DisConnected\r\n",14);
+        uart_write_bytes(uart_num, "DisConnected:\r\n",15); // TODO -- issue here
       }
       break;
   }

@@ -27,6 +27,7 @@
 #include "esp_gattc_api.h"
 #include "esp_gatt_defs.h"
 #include "esp_bt_main.h"
+#include "esp_timer.h"
 #include "esp_gatt_common_api.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -34,6 +35,7 @@
 
 #include "bt.h"
 #include "bt_client.h"
+#include "frskybt.h"
 #include "defines.h"
 
 #define GATTC_TAG "BTCLIENT"
@@ -119,6 +121,18 @@ static struct gattc_profile_inst gl_profile_tab[PROFILE_NUM] = {
 #include "esp_log.h"
 #include "bt.h"
 
+void gattc_update_connection_params(esp_bd_addr_t *remote_bda)
+{
+    esp_ble_conn_update_params_t conn_params;
+    memcpy(conn_params.bda, remote_bda, sizeof(esp_bd_addr_t));
+    conn_params.min_int = 0x0A; // x 1.25ms
+    conn_params.max_int = 0x0A; // x 1.25ms
+    conn_params.latency = 0x00; //number of skippable connection events
+    conn_params.timeout = 70; // x 6.25ms, time before peripheral will assume connection is dropped.
+
+    esp_ble_gap_update_conn_params(&conn_params);
+}
+
 static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param)
 {
     esp_ble_gattc_cb_param_t *p_data = (esp_ble_gattc_cb_param_t *)param;
@@ -148,7 +162,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         btc_scan_complete = false;
         ESP_LOGI(GATTC_TAG, "Starting Service Scan");
         esp_ble_gattc_search_service(gattc_if, param->cfg_mtu.conn_id, &remote_filter_service_uuid);
-
+        gattc_update_connection_params(&param->connect.remote_bda);
         break;
     }
     case ESP_GATTC_OPEN_EVT:
@@ -326,6 +340,22 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
     }
     case ESP_GATTC_NOTIFY_EVT:
         if (p_data->notify.is_notify) {
+#if defined(DEBUG_TIMERS)          
+          static int64_t ctime = 0;
+          parserBTData(p_data->notify.value, p_data->notify.value_len);
+
+         // printf("Update(%lld), curtime %lld\n", esp_timer_get_time() - ctime, esp_timer_get_time());
+          //ctime = esp_timer_get_time();
+          /*if(ctime < esp_timer_get_time()) {
+            printf("Updates in %dus %dHz\n",20000, updates);
+            ctime = esp_timer_get_time() + 20000;
+            updates = 0;
+          }
+          updates ++;*/
+#endif          
+
+          // TODO, verify what characteristic is sending.
+          //
            // if(p_data->notify.handle == bt_datahandle) // If notify coming from the data handle, send it to the UART port
               uart_write_bytes(uart_num, (void*)p_data->notify.value, p_data->notify.value_len);
           //  else 
@@ -504,7 +534,7 @@ void btc_dohtreset()
                                             ESP_GATT_WRITE_TYPE_NO_RSP,
                                             ESP_GATT_AUTH_REQ_NONE);
         if(status != ESP_OK) {
-            printf("Error Writing to Characteristic");
+            ESP_LOGE(GATTC_TAG, "Error Writing to Characteristic");
         }
     }
 }
@@ -546,27 +576,8 @@ void btcInit()
 {
   ESP_LOGI(GATTC_TAG, "Starting Central");
   
-  esp_err_t ret;
-  ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
-  if (ret) {
-      ESP_LOGE(GATTC_TAG, "%s enable controller failed: %s\n", __func__, esp_err_to_name(ret));
-      return;
-  }
-
-  ret = esp_bluedroid_init();
-  if (ret) {
-      ESP_LOGE(GATTC_TAG, "%s init bluetooth failed: %s\n", __func__, esp_err_to_name(ret));
-      return;
-  }
-
-  ret = esp_bluedroid_enable();
-  if (ret) {
-      ESP_LOGE(GATTC_TAG, "%s enable bluetooth failed: %s\n", __func__, esp_err_to_name(ret));
-      return;
-  }
-
   //register the  callback function to the gap module
-  ret = esp_ble_gap_register_callback(esp_gap_cb);
+  esp_err_t ret = esp_ble_gap_register_callback(esp_gap_cb);
   if (ret){
       ESP_LOGE(GATTC_TAG, "%s gap register failed, error code = %x\n", __func__, ret);
       return;
@@ -587,4 +598,10 @@ void btcInit()
   if (local_mtu_ret){
       ESP_LOGE(GATTC_TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
   }
+
+  vTaskDelay(pdMS_TO_TICKS(500));
+  // Try to connect to saved address on startup
+  esp_bd_addr_t addr;
+  strtobtaddr(addr, settings.rmtbtaddr);
+  btc_connect(addr);
 }
