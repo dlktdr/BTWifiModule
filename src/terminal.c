@@ -49,12 +49,15 @@ btcentralstate btCentralState = CENTRAL_STATE_DISCONNECT;
 btperipheralstate btPeripherialState = PERIPHERIAL_STATE_DISCONNECTED;
 int64_t baudTimer =0;
 int laddcnt = 0;
-char lcladdress[13] = "000000000000";
+
 char rmtaddress[13] = "000000000000";
 char reusablebuff[REUSABLE_BUFFER];
 
 void sendBTMode()
 {
+  char lcladdress[13] = "000000000000";
+  btaddrtostr(lcladdress, localbtaddress);
+  ESP_LOGI(LOG_UART,"Local Addr %s", lcladdress);
   if(curMode == ROLE_BLE_PERIPHERAL) {
     snprintf(reusablebuff, sizeof(reusablebuff), "Peripheral:%s\r\n", lcladdress);
     uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
@@ -67,13 +70,13 @@ void sendBTMode()
 void parserBTData(const char btdata[], int len)
 {
   static int64_t ltime =0;
-  int64_t timestamp = esp_timer_get_time() - ltime;  
+  int64_t timestamp = esp_timer_get_time() - ltime;
   ltime = esp_timer_get_time();
   uint16_t channeldata[8];
   if(processTrainer(btdata, len, channeldata)) {
     ESP_LOGE(LOG_UART, "(%05lld)[%02d] Unable to decode data", timestamp,len);
   } else {
-    ESP_LOGI(LOG_UART, "(%05lld)[%02d] Ch0[%04d] Ch1[%04d] Ch2[%04d] Ch3[%04d] Ch4[%04d] Ch5[%04d] Ch6[%04d] Ch7[%04d]", 
+    ESP_LOGI(LOG_UART, "(%05lld)[%02d] Ch0[%04d] Ch1[%04d] Ch2[%04d] Ch3[%04d] Ch4[%04d] Ch5[%04d] Ch6[%04d] Ch7[%04d]",
                      timestamp,
                      len,
                      channeldata[0],
@@ -114,7 +117,7 @@ void parserATCommand(char atcommand[])
   } else if (strncmp(atcommand, "+ROLE2", 6) == 0) {
     ESP_LOGI(LOG_UART,"Setting role as A2DP Source");
     UART_WRITE_STRING(uart_num, "OK+Role:2\r\n");
-    setRole(ROLE_BTEDR_AUDIO_SOURCE);    
+    setRole(ROLE_BTEDR_AUDIO_SOURCE);
     sendBTMode();
 
   } else if (strncmp(atcommand, "+CON", 4) == 0) {
@@ -132,6 +135,7 @@ void parserATCommand(char atcommand[])
 
   } else if (strncmp(atcommand, "+NAME", 5) == 0) {
     ESP_LOGI(LOG_UART,"Setting Name to %s", atcommand + 5);
+    btSetName(atcommand + 5);
     snprintf(reusablebuff, sizeof(reusablebuff), "OK+Name:%s\r\n", atcommand +5);
     uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
     sendBTMode();
@@ -146,7 +150,7 @@ void parserATCommand(char atcommand[])
       ESP_LOGI(LOG_UART, "Discovery Requested");
       UART_WRITE_STRING(uart_num, "OK+DISCS\r\n");
       laddcnt = 0;
-      if(btCentralState != CENTRAL_STATE_SCAN_START && 
+      if(btCentralState != CENTRAL_STATE_SCAN_START &&
          btCentralState != CENTRAL_STATE_SCANNING)
         btCentralState = CENTRAL_STATE_SCAN_START;
     }
@@ -161,7 +165,7 @@ void parserATCommand(char atcommand[])
     strncpy(reusablebuff, &atcommand[6], sizeof(reusablebuff));
     int baudrate = atoi(reusablebuff);
     ESP_LOGI(LOG_UART, "Baud Rate Change Requested to %d", baudrate);
-    
+
     baudTimer = esp_timer_get_time() + BAUD_RESET_TIMER;
     //setBaudRate(baudrate);
     //UART_WRITE_STRING(uart_num, "OK+BAUD\r\n");
@@ -195,7 +199,7 @@ uart_config_t uart_config = {
     .source_clk = UART_SCLK_APB,
 };
 
-void setBaudRate(uint32_t baudRate) 
+void setBaudRate(uint32_t baudRate)
 {
   if(baudRate < BAUD_DEFAULT || baudRate > BAUD_MAXIMUM) return;
   uart_config.baud_rate = baudRate;
@@ -216,10 +220,10 @@ void runUARTHead() {
   ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
   ESP_ERROR_CHECK(uart_driver_install(uart_num, UART_RX_BUFFER * 2,
                                       UART_RX_BUFFER * 2, 0, NULL, 0));
-  ESP_ERROR_CHECK(uart_set_pin(uart_num, UART_TXPIN, 
-                                         UART_RXPIN, 
-                                         UART_PIN_NO_CHANGE, 
-                                         UART_PIN_NO_CHANGE));                                      
+  ESP_ERROR_CHECK(uart_set_pin(uart_num, UART_TXPIN,
+                                         UART_RXPIN,
+                                         UART_PIN_NO_CHANGE,
+                                         UART_PIN_NO_CHANGE));
 
   cb_init(&uartinbuf, UART_RX_BUFFER*2);
 
@@ -323,7 +327,7 @@ void setRole(role_t role)
     case ROLE_BLE_PERIPHERAL:
       btPeripherialState = PERIPHERIAL_STATE_DISCONNECTED;
       bt_init();
-      btpInit(); 
+      btpInit();
       break;
     case ROLE_BTEDR_AUDIO_SOURCE:
       // Bluetooth audio sink.
@@ -336,13 +340,13 @@ void setRole(role_t role)
     default:
       break;
   }
-  
+
   // Save new role to flash
   saveSettings();
 }
 
 
-void runBTCentral() 
+void runBTCentral()
 {
   switch(btCentralState) {
     case CENTRAL_STATE_DISCONNECT: {
@@ -381,7 +385,7 @@ void runBTCentral()
       //esp_bd_addr_t btaddr;
       //if(!readBTAddress(btaddr)) {
       //  btCentralState = CENTRAL_STATE_CONNECT;
-      //}  
+      //}
       // Do Nothing
       break;
     }
@@ -402,9 +406,9 @@ void runBTCentral()
           sprintf(reusablebuff, "MTU Size:65\r\nMTU Size: 65\r\nPHT Update Complete\r\nCurrent PHY:2M\r\n"); // Fix me
           uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
           sprintf(reusablebuff, "Board:%s\r\n", str_ble_board_types[btc_board_type]);
-          uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));           
+          uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
           btCentralState = CENTRAL_STATE_CONNECTED;
-          // TODO: Add 
+          // TODO: Add
 
         } else {
           btCentralState = CENTRAL_STATE_DISCONNECT;
@@ -436,13 +440,13 @@ void runBTPeripherial()
     case PERIPHERIAL_STATE_CONNECTED:
       if(!btp_connected) {
         btPeripherialState = PERIPHERIAL_STATE_DISCONNECTED;
-        uart_write_bytes(uart_num, "DisConnected:\r\n",15); // TODO -- issue here
+        uart_write_bytes(uart_num, "DisConnected\r\nERROR\r\nERROR\r\n",28);
       }
       break;
   }
 }
 
-void runBT() 
+void runBT()
 {
   switch(curMode) {
     case ROLE_BLE_CENTRAL:

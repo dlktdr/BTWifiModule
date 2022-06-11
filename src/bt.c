@@ -13,8 +13,12 @@
 #include "freertos/task.h"
 
 #define LOG_BT "BT"
+#define MAX_BTNAME_LEN 50
 
+esp_bd_addr_t localbtaddress;
 esp_bd_addr_t rmtbtaddress;
+
+char btname[MAX_BTNAME_LEN] = "Hello";
 
 void strtobtaddr(esp_bd_addr_t dest, char *src)
 {
@@ -58,7 +62,7 @@ void bt_init()
     ESP_LOGE(LOG_BT, "%s initialize controller failed: %s\n", __func__, esp_err_to_name(ret));
     return;
   }
-  
+
   ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
   if (ret) {
     ESP_LOGE(LOG_BT, "%s enable controller failed: %s\n", __func__, esp_err_to_name(ret));
@@ -76,6 +80,8 @@ void bt_init()
     ESP_LOGE(LOG_BT, "%s enable bluetooth failed: %s\n", __func__, esp_err_to_name(ret));
     return;
   }
+
+  esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, ESP_PWR_LVL_P9 );
 }
 
 void bt_disable()
@@ -85,7 +91,14 @@ void bt_disable()
   esp_bluedroid_deinit();
   esp_bt_controller_disable();
   esp_bt_controller_deinit();
-  
+
   ESP_LOGI(LOG_BT,"Pausing to shutdown");
   vTaskDelay(pdMS_TO_TICKS(250));
+}
+
+void btSetName(const char *name)
+{
+  strncpy(btname, name, sizeof(btname));
+  btname[sizeof(btname)-1] = '\0';
+  ESP_LOGI(LOG_BT,"Setting BT Name %s", name);
 }

@@ -552,4 +552,8 @@ void btpInit(void)
   if (local_mtu_ret){
     ESP_LOGE(GATTS_TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
   }
+
+  // Update Local Address
+  uint8_t adrtype;
+  esp_ble_gap_get_local_used_addr(localbtaddress, &adrtype);
 }

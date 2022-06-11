@@ -69,6 +69,6 @@ void app_main(void) {
   ESP_ERROR_CHECK(ret);
 
   ESP_ERROR_CHECK(nvs_open("btwifi",NVS_READWRITE, &nvs_flsh_btw));
-  
+
   loadSettings();
 }
