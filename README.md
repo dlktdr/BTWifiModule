@@ -20,7 +20,3 @@ To Do (Plan is to work top down)
 - [ ] OTA Radio firmware update (Probably EdgeTX only)
 - [ ] Mavlink Router Using a Wifi AP
 - [ ] A2DP Audio Source, Mirror Radio Audio
-
-On the ideas list.. 
------------------
-- Design jumper board to have available for installation in the radio. W/ESP WROOM32U (External Antenna)
