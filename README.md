@@ -13,7 +13,7 @@ To Do (Plan is to work top down)
 - [x] Bluetooth Master/Bluetooth Scan and Device Connection
 - [x] Bluetooth Trainer Receiver (Master / Bluetooth)
 - [X] Bluetooth Trainer Transmitter (Slave / Bluetooth)
-- [ ] Bluetooth Telewmetery Transmitter
+- [ ] Bluetooth Telemetry Transmitter
 - [ ] ESPNow Trainer Master
 - [ ] ESPNow Trainer Slave
 - [ ] OTA Firmware updates for ESP (In AP mode via HTTP server)
