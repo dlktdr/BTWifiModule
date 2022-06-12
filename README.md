@@ -12,16 +12,14 @@ To Do (Plan is to work top down)
 - [x] At Modem Command Set to Radio via UART
 - [x] Bluetooth Master/Bluetooth Scan and Device Connection
 - [x] Bluetooth Trainer Receiver (Master / Bluetooth)
-- [ ] Bluetooth Trainer Transmitter (Slave / Bluetooth)
+- [X] Bluetooth Trainer Transmitter (Slave / Bluetooth)
 - [ ] Bluetooth Telewmetery Transmitter
-- [ ] Wifi Mode Selection (Extra AT commands including settings) (Access Point / Device / Ad-Hoc)
-   - Wifi Modes
-     - Trainer Not sure on a good mode here yet, probably not infrastructure mode tho, point to point maybe in 11b LR mode. 
-       **EDIT:** I think ESPnow is a perfect solution, point to point and still works in LR mode.
-     - Telemetry
-     - Mavlink Router (Eventually, with radio support)
+- [ ] ESPNow Trainer Master
+- [ ] ESPNow Trainer Slave
 - [ ] OTA Firmware updates for ESP (In AP mode via HTTP server)
 - [ ] OTA Radio firmware update (Probably EdgeTX only)
+- [ ] Mavlink Router Using a Wifi AP
+- [ ] A2DP Audio Source, Mirror Radio Audio
 
 On the ideas list.. 
 -----------------
