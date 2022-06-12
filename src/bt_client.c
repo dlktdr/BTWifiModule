@@ -564,8 +564,8 @@ void btc_connect(esp_bd_addr_t addr)
   btc_validslavefound = false;
   char saddr[13];
   memcpy(rmtbtaddress, addr, sizeof(esp_bd_addr_t));
-  printf("Connecting to %s\r\n", btaddrtostr(saddr,addr));
-  esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, addr, BLE_ADDR_TYPE_RANDOM, true);
+  printf("Connecting to %s\r\n", btaddrtostr(saddr,addr)); // TODO FIX ME
+  //esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, addr, BLE_ADDR_TYPE_RANDOM, true);
 }
 
 void btc_disconnect()
