@@ -16,4 +16,4 @@ enum {
 };
 
 int setTrainer(uint8_t *addr, uint16_t chan_vals[BT_CHANNELS]);
-int processTrainer(const char *data, int len, uint16_t channels[BT_CHANNELS]);
+void frSkyProcessByte(uint8_t data);

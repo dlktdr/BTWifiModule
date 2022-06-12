@@ -4,6 +4,7 @@
 #include "bt_client.h"
 
 typedef struct {
+  //uint8_t version // Todo the version info here, check on load it matches otherwise ignore
   char rmtbtaddr[13];
   role_t role;
 } settings_t;

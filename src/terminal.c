@@ -67,29 +67,6 @@ void sendBTMode()
   }
 }
 
-void parserBTData(const char btdata[], int len)
-{
-  static int64_t ltime =0;
-  int64_t timestamp = esp_timer_get_time() - ltime;
-  ltime = esp_timer_get_time();
-  uint16_t channeldata[8];
-  if(processTrainer(btdata, len, channeldata)) {
-    ESP_LOGE(LOG_UART, "(%05lld)[%02d] Unable to decode data", timestamp,len);
-  } else {
-    ESP_LOGI(LOG_UART, "(%05lld)[%02d] Ch0[%04d] Ch1[%04d] Ch2[%04d] Ch3[%04d] Ch4[%04d] Ch5[%04d] Ch6[%04d] Ch7[%04d]",
-                     timestamp,
-                     len,
-                     channeldata[0],
-                     channeldata[1],
-                     channeldata[2],
-                     channeldata[3],
-                     channeldata[4],
-                     channeldata[5],
-                     channeldata[6],
-                     channeldata[7]);
-  }
-}
-
 void parserATCommand(char atcommand[])
 {
   // Strip trailing whitespace
@@ -167,7 +144,7 @@ void parserATCommand(char atcommand[])
     ESP_LOGI(LOG_UART, "Baud Rate Change Requested to %d", baudrate);
 
     baudTimer = esp_timer_get_time() + BAUD_RESET_TIMER;
-    //setBaudRate(baudrate);
+    //setBaudRate(baudrate); TODO
     //UART_WRITE_STRING(uart_num, "OK+BAUD\r\n");
 
     // TO DO: We need to check if the new baud worked. If the above timer elapses
@@ -209,13 +186,9 @@ void setBaudRate(uint32_t baudRate)
 char atcommand[AT_CMD_MAX_LEN];
 int atcommandlen=-1;
 
-char btcommand[BT_CMD_MAX_LEN];
-int btcommandlen=-1;
-
 circular_buffer uartinbuf;
 
 void runUARTHead() {
-
   // Setup UART Port
   ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
   ESP_ERROR_CHECK(uart_driver_install(uart_num, UART_RX_BUFFER * 2,
@@ -263,29 +236,15 @@ void runUARTHead() {
           parserATCommand(atcommand);
           atcommandlen = -1;
         }
-      } else if (btcommandlen >= 0) {
-        btcommand[btcommandlen++] = c;
-        // Check for buffer overflow
-        if(btcommandlen >= sizeof(btcommand)-1) {
-          ESP_LOGE(LOG_UART, "BT Data Buffer Overflow");
-          btcommandlen = -1;
-          continue;
-        }
-        // BT Command Termination
-        if(c == START_STOP) {
-          parserBTData(btcommand, btcommandlen);
-          //printf(".");
-          btcommandlen = -1;
-        }
       } else {
+        // Scan for characters AT in the byte stream
         static char lc=0;
         if(lc == 'A' && c == 'T') {
           atcommandlen = 0;
+        } else {
+          frSkyProcessByte(c);
         }
-        else if(c == START_STOP) {
-          btcommand[0] = START_STOP; // Be sure to include start stop in stream
-          btcommandlen = 1;
-        }
+
         lc = c;
       }
     }

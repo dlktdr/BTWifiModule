@@ -14,5 +14,6 @@
 
 void btpInit();
 void btp_disconnect();
+int btp_sendChannelData(uint8_t *data, int len);
 
 extern volatile bool btp_connected;

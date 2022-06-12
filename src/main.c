@@ -44,7 +44,6 @@ void runBlinky() {
 }
 #endif
 
-
 void app_main(void) {
 
   TaskHandle_t tUartHnd = NULL;

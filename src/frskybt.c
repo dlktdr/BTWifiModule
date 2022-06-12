@@ -3,11 +3,46 @@
 
 #include <stdbool.h>
 #include "frskybt.h"
+#include "bt_server.h"
+#include "settings.h"
+#include "esp_log.h"
 
+#define FRSKYBT_TAG "FRSKYBT"
 
 #define LEN_BLUETOOTH_ADDR 16
 #define BLUETOOTH_LINE_LENGTH 32
 #define BLUETOOTH_PACKET_SIZE 14
+
+uint16_t channeldata[BT_CHANNELS];
+
+/**
+ * @brief Displays the decoded channel values and time since last receive
+ *
+ * @param btdata
+ * @param len
+ */
+
+void logBTFrame(bool valid, char message[])
+{
+  static int64_t ltime =0;
+  int64_t timestamp = esp_timer_get_time() - ltime;
+  ltime = esp_timer_get_time();
+  if(!valid) {
+    ESP_LOGE(FRSKYBT_TAG, "(%05lld)Unable to decode data, %s", timestamp, message);
+  } else {
+    ESP_LOGI(FRSKYBT_TAG, "(%05lld)Ch1[%04d] Ch2[%04d] Ch3[%04d] Ch4[%04d] Ch5[%04d] Ch6[%04d] Ch7[%04d] Ch8[%04d]",
+                     timestamp,
+                     channeldata[0],
+                     channeldata[1],
+                     channeldata[2],
+                     channeldata[3],
+                     channeldata[4],
+                     channeldata[5],
+                     channeldata[6],
+                     channeldata[7]);
+  }
+}
+
 
 static uint8_t buffer[BLUETOOTH_LINE_LENGTH+1];
 static uint8_t bufferIndex;
@@ -65,32 +100,36 @@ STATE_DATA_XOR,
 STATE_DATA_IN_FRAME
 };
 
-uint8_t otxbuffer[BLUETOOTH_LINE_LENGTH+1];
+static uint8_t _otxbuffer[BLUETOOTH_LINE_LENGTH+2] = {START_STOP};
+static uint8_t *otxbuffer = _otxbuffer + 1;
 uint8_t otxbufferIndex = 0;
-uint16_t chan_out[BT_CHANNELS];
 bool btprocessed = false;
 
 void appendTrainerByte(uint8_t data)
 {
   if (otxbufferIndex < BLUETOOTH_LINE_LENGTH) {
     otxbuffer[otxbufferIndex++] = data;
-    // we check for "DisConnected", but the first byte could be altered (if received in state STATE_DATA_XOR)
-    if (data == '\n') {
-        otxbufferIndex = 0;
-    }
+  } else {
+    ESP_LOGE(FRSKYBT_TAG,"OTX Buffer Overflow");
+    otxbufferIndex = 0;
   }
 }
 
 void processTrainerFrame(const uint8_t * otxbuffer)
-{  
+{
   for (uint8_t channel=0, i=1; channel<BT_CHANNELS; channel+=2, i+=3) {
     // +-500 != 512, but close enough.
-    chan_out[channel] = otxbuffer[i] + ((otxbuffer[i+1] & 0xf0) << 4);
-    chan_out[channel+1] = ((otxbuffer[i+1] & 0x0f) << 4) + ((otxbuffer[i+2] & 0xf0) >> 4) + ((otxbuffer[i+2] & 0x0f) << 8);
+    channeldata[channel] = otxbuffer[i] + ((otxbuffer[i+1] & 0xf0) << 4);
+    channeldata[channel+1] = ((otxbuffer[i+1] & 0x0f) << 4) + ((otxbuffer[i+2] & 0xf0) >> 4) + ((otxbuffer[i+2] & 0x0f) << 8);
+  }
+
+  // If the data came from the radio, send it out over bluetooth. Use the buffer that has START_STOP as first char
+  if(settings.role == ROLE_BLE_PERIPHERAL) {
+    btp_sendChannelData(_otxbuffer, otxbufferIndex+1);
   }
 }
 
-void processTrainerByte(uint8_t data)
+void frSkyProcessByte(uint8_t data)
 {
   static uint8_t dataState = STATE_DATA_IDLE;
 
@@ -130,7 +169,7 @@ void processTrainerByte(uint8_t data)
           otxbufferIndex = 0;
           dataState = STATE_DATA_IN_FRAME;
           break;
-        default:  
+        default:
           // Illegal situation, start looking for a new START_STOP byte
           dataState = STATE_DATA_START;
           break;
@@ -156,22 +195,13 @@ void processTrainerByte(uint8_t data)
     if (crc == otxbuffer[BLUETOOTH_PACKET_SIZE - 1]) {
       if (otxbuffer[0] == TRAINER_FRAME) {
         processTrainerFrame(otxbuffer);
-        btprocessed = true;
+        logBTFrame(true, "");
+      } else {
+        logBTFrame(false, "Not a trainer frame");
       }
+    } else {
+      logBTFrame(false, "CRC Fault");
     }
     dataState = STATE_DATA_IDLE;
   }
-}
-
-int processTrainer(const char *data, int len, uint16_t channels[BT_CHANNELS])
-{
-  btprocessed = false;
-  for(int i=0; i < len; i++) {
-    processTrainerByte(data[i]);
-  }
-  if(!btprocessed)
-    return -1;
-  
-  memcpy(channels, chan_out, sizeof(chan_out));
-  return 0;
 }

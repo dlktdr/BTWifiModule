@@ -93,7 +93,7 @@ void bt_disable()
   esp_bt_controller_deinit();
 
   ESP_LOGI(LOG_BT,"Pausing to shutdown");
-  vTaskDelay(pdMS_TO_TICKS(250));
+  vTaskDelay(pdMS_TO_TICKS(BT_PAUSE_BEFORE_RESTART));
 }
 
 void btSetName(const char *name)

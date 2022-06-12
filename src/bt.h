@@ -2,6 +2,8 @@
 
 #include "esp_bt_defs.h"
 
+#define BT_PAUSE_BEFORE_RESTART 250 //ms
+
 extern esp_bd_addr_t rmtbtaddress;
 extern esp_bd_addr_t localbtaddress;
 extern char btname[];

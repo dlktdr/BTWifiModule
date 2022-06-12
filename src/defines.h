@@ -45,8 +45,13 @@ typedef enum {
   ROLE_UNKNOWN=0,
   ROLE_BLE_PERIPHERAL,
   ROLE_BLE_CENTRAL,
-  ROLE_ESPNOW_PERIPHERAL,
-  ROLE_ESPNOW_CENTRAL,
-  ROLE_BTEDR_AUDIO_SOURCE,
+  ROLE_ADVANCE,
   ROLE_COUNT
 } role_t;
+
+enum features {
+  FEAT_BLUETOOTH,
+  FEAT_ESPNOW,
+};
+
+#define PACKED __attribute__((packed))
