@@ -36,6 +36,7 @@
 #include "bt.h"
 #include "bt_client.h"
 #include "frskybt.h"
+#include "terminal.h"
 #include "defines.h"
 
 #define GATTC_TAG "BTCLIENT"
@@ -158,11 +159,16 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         if (mtu_ret){
             ESP_LOGE(GATTC_TAG, "config MTU error, error code = %x", mtu_ret);
         }
-
+        /*esp_ble_gap_set_prefered_phy(param->connect.remote_bda,
+                                     ESP_BLE_GAP_NO_PREFER_TRANSMIT_PHY|ESP_BLE_GAP_NO_PREFER_RECEIVE_PHY,
+                                     ESP_BLE_GAP_PHY_CODED_PREF_MASK,
+                                     ESP_BLE_GAP_PHY_CODED_PREF_MASK,
+                                     ESP_BLE_GAP_PHY_OPTIONS_PREF_S8_CODING);*/
         btc_scan_complete = false;
         ESP_LOGI(GATTC_TAG, "Starting Service Scan");
         esp_ble_gattc_search_service(gattc_if, param->cfg_mtu.conn_id, &remote_filter_service_uuid);
         gattc_update_connection_params(&param->connect.remote_bda);
+
         break;
     }
     case ESP_GATTC_OPEN_EVT:
@@ -224,7 +230,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
                 ESP_LOGE(GATTC_TAG, "esp_ble_gattc_get_attr_count error");
             }
 
-            ESP_LOGI(GATTC_TAG, "Attr Count %d", count);  
+            ESP_LOGI(GATTC_TAG, "Attr Count %d", count);
 
             if (count > 0){
                 char_elem_result = (esp_gattc_char_elem_t *)malloc(sizeof(esp_gattc_char_elem_t) * MAX_CHAR_TO_SCAN);
@@ -255,18 +261,18 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
                                 ESP_LOGI(GATTC_TAG, "Subscribing for Notifications");
                                 gl_profile_tab[PROFILE_A_APP_ID].char_handle = char_elem_result[i].char_handle;
                                 esp_ble_gattc_register_for_notify (gattc_if, gl_profile_tab[PROFILE_A_APP_ID].remote_bda, char_elem_result[i].char_handle);
-                            } 
+                            }
 
                             // Update Flash to Save Last Connected BT Address
                             btaddrtostr(settings.rmtbtaddr, gl_profile_tab[PROFILE_A_APP_ID].remote_bda);
                             saveSettings();
-                            
+
                         } else if (char_elem_result[i].uuid.uuid.uuid16 == 0xAFF2) {
                             ESP_LOGI(GATTC_TAG, "Found the reset characteristic. This is a headtracker board");
                             btc_board_type = BLE_BOARD_HEADTRACKER;
                             bt_htresethandle = char_elem_result[i].char_handle;
 
-                         
+
                         } else if (char_elem_result[i].uuid.uuid.uuid16 == 0xAFF1) {
                             ESP_LOGI(GATTC_TAG, "Found the valid channels. This is a headtracker board");
                             btc_board_type = BLE_BOARD_HEADTRACKER;
@@ -340,9 +346,9 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
     }
     case ESP_GATTC_NOTIFY_EVT:
         if (p_data->notify.is_notify) {
-#if defined(DEBUG_TIMERS)          
-          static int64_t ctime = 0;
-          parserBTData(p_data->notify.value, p_data->notify.value_len);
+#if defined(DEBUG_TIMERS)
+          //static int64_t ctime = 0;
+          logBTFrame((const char *)p_data->notify.value, p_data->notify.value_len);
 
          // printf("Update(%lld), curtime %lld\n", esp_timer_get_time() - ctime, esp_timer_get_time());
           //ctime = esp_timer_get_time();
@@ -352,13 +358,13 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
             updates = 0;
           }
           updates ++;*/
-#endif          
+#endif
 
           // TODO, verify what characteristic is sending.
           //
            // if(p_data->notify.handle == bt_datahandle) // If notify coming from the data handle, send it to the UART port
               uart_write_bytes(uart_num, (void*)p_data->notify.value, p_data->notify.value_len);
-          //  else 
+          //  else
           //    ESP_LOGI(GATTC_TAG, "ESP_GATTC_NOTIFY_EVT, receive unknown notify value:");
         } else {
             ESP_LOGI(GATTC_TAG, "ESP_GATTC_NOTIFY_EVT, receive indicate value:");
@@ -575,7 +581,7 @@ void btc_disconnect()
 void btcInit()
 {
   ESP_LOGI(GATTC_TAG, "Starting Central");
-  
+
   //register the  callback function to the gap module
   esp_err_t ret = esp_ble_gap_register_callback(esp_gap_cb);
   if (ret){
@@ -598,6 +604,11 @@ void btcInit()
   if (local_mtu_ret){
       ESP_LOGE(GATTC_TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
   }
+
+  // Update Local Address
+  uint8_t adrtype;
+  esp_ble_gap_get_local_used_addr(localbtaddress, &adrtype);
+
 
   vTaskDelay(pdMS_TO_TICKS(500));
   // Try to connect to saved address on startup

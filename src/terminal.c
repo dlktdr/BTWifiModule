@@ -91,12 +91,6 @@ void parserATCommand(char atcommand[])
     setRole(ROLE_BLE_CENTRAL);
     sendBTMode();
 
-  } else if (strncmp(atcommand, "+ROLE2", 6) == 0) {
-    ESP_LOGI(LOG_UART,"Setting role as A2DP Source");
-    UART_WRITE_STRING(uart_num, "OK+Role:2\r\n");
-    setRole(ROLE_BTEDR_AUDIO_SOURCE);
-    sendBTMode();
-
   } else if (strncmp(atcommand, "+CON", 4) == 0) {
     if(curMode == ROLE_BLE_CENTRAL) {
       // Connect to device specified
@@ -265,9 +259,6 @@ void setRole(role_t role)
   switch(curMode) {
     case ROLE_BLE_CENTRAL:
     case ROLE_BLE_PERIPHERAL:
-    case ROLE_BTEDR_AUDIO_SOURCE:
-      bt_disable();
-      break;
     default:
       break;
   }
@@ -287,14 +278,6 @@ void setRole(role_t role)
       btPeripherialState = PERIPHERIAL_STATE_DISCONNECTED;
       bt_init();
       btpInit();
-      break;
-    case ROLE_BTEDR_AUDIO_SOURCE:
-      // Bluetooth audio sink.
-
-      // Baud rate check to make sure we are at a higher rate of at least xxx
-      // for 44.1khz 16bit, 1ch |  44,100 x 16 x 1 = 1,411,200 | 1411200/8 = 176,400 B/s + Some Bytestuffing for AT commands.
-      // Probably need 2Mbaud.... or reduce audio quality
-
       break;
     default:
       break;
@@ -414,12 +397,12 @@ void runBT()
     case ROLE_BLE_PERIPHERAL:
       runBTPeripherial();
       break;
-    case ROLE_BTEDR_AUDIO_SOURCE:
+    /*case ROLE_BTEDR_AUDIO_SOURCE:
       break;
     case ROLE_ESPNOW_CENTRAL:
       break;
     case ROLE_ESPNOW_PERIPHERAL:
-      break;
+      break;*/
     default:
       break;
   }
