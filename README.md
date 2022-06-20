@@ -9,14 +9,18 @@ So far this has been tested on the PICO / WROOM32 and C3mini Boards. I would rec
 
 Choosing the ESP32-C3-DEVKITM-1U board would be my choice at the moment, as it will be able to support the newer features of BT5.0, when available. https://www.digikey.ca/en/products/detail/espressif-systems/ESP32-C3-DEVKITM-1U/15198974 this link did come with an antenna when I ordered it, even though it doesn't show one.
 
-**NOTE** This is still a work in progress, there will be some issues. If you have any questions please ask in the HeadTracker **#dev** [Discord](https://discord.gg/ux5hEaNSPQ) or add an [issue](https://github.com/dlktdr/BTWifiModule/issues) here. See the pin connections here for the supported boards. 
-https://github.com/dlktdr/BTWifiModule/blob/57d511cb12d4203ff344db9a17360db8373ac9f0/src/defines.h#L5-L22 
+**NOTE** This is still a work in progress, there will be some issues. If you have any questions please ask in the HeadTracker **#dev** [Discord](https://discord.gg/ux5hEaNSPQ) or add an [issue](https://github.com/dlktdr/BTWifiModule/issues) here. 
 
-Currently won't connect to another PARA module, missing something here still.
+## RX/TX Pin Connections are Here
+https://github.com/dlktdr/BTWifiModule/blob/main/src/defines.h
 
-Haven't tested connecting to a CC2540 module yet.
+**This does require the Bluetooth option to be compiled/enabled in on the OpenTX or EdgeTX firmware.**
 
-Works okay to the HeadTracker or to Another ESP module.
+## Notes
+
+* Currently won't connect to another PARA module, missing something here still.
+* Haven't tested connecting to a CC2540 module yet.
+* Works okay to the HeadTracker or to Another ESP module.
 
 To Do (Plan is to work top down)
 ---------
