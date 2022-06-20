@@ -3,14 +3,14 @@ name: Firmware Build
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - '.github/workflows/build-firmware.yml'
       - 'src/**'
 
   pull_request:
     branches:
-      - master
+      - main
     paths:
       - '.github/workflows/build-firmware.yml'
       - 'src/**'
