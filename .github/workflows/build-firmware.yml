@@ -53,11 +53,19 @@ jobs:
           pip install --upgrade platformio
 
       # Runs a single command using the runners shell
-      - name: Build Firmware
+      - name: Build Firmware Pico32
         run: |
           cd /src
           pio run -e pico32
+
+      - name: Build Firmware Wroom32
+        run: |
+          cd /src
           pio run -e Node32s_Wroom32
+
+      - name: Build Firmware C3Mini
+        run: |
+          cd /src
           pio run -e C3Mini
 
       # Runs a set of commands using the runners shell
