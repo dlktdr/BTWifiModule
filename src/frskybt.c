@@ -123,7 +123,7 @@ void processTrainerFrame(const uint8_t * otxbuffer)
     channeldata[channel+1] = ((otxbuffer[i+1] & 0x0f) << 4) + ((otxbuffer[i+2] & 0xf0) >> 4) + ((otxbuffer[i+2] & 0x0f) << 8);
   }
 
-  // If the data came from the radio, send it out over bluetooth. Use the buffer that has START_STOP as first char
+  // If the data came from the radio, send it out over bluetooth. Send same data but add the START_STOP
   if(settings.role == ROLE_BLE_PERIPHERAL) {
     btp_sendChannelData(_otxbuffer, otxbufferIndex+1);
   }
@@ -203,5 +203,12 @@ void frSkyProcessByte(uint8_t data)
       logBTFrame(false, "CRC Fault");
     }
     dataState = STATE_DATA_IDLE;
+  }
+}
+
+void processFrame(const uint8_t *frame, uint8_t len)
+{
+  for(int i=0;i < len; i++) {
+    frSkyProcessByte(frame[i]);
   }
 }

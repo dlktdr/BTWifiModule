@@ -346,24 +346,13 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
     }
     case ESP_GATTC_NOTIFY_EVT:
         if (p_data->notify.is_notify) {
-#if defined(DEBUG_TIMERS)
-          //static int64_t ctime = 0;
-          logBTFrame((const char *)p_data->notify.value, p_data->notify.value_len);
-
-         // printf("Update(%lld), curtime %lld\n", esp_timer_get_time() - ctime, esp_timer_get_time());
-          //ctime = esp_timer_get_time();
-          /*if(ctime < esp_timer_get_time()) {
-            printf("Updates in %dus %dHz\n",20000, updates);
-            ctime = esp_timer_get_time() + 20000;
-            updates = 0;
-          }
-          updates ++;*/
+          // TODO, verify what characteristic is being notified
+#ifdef DEBUG_TIMERS
+          processFrame(p_data->notify.value,p_data->notify.value_len); // Used to decode the channel data for debugging
 #endif
+          uart_write_bytes(uart_num, (void*)p_data->notify.value, p_data->notify.value_len); // Write the received data to the UART port
 
-          // TODO, verify what characteristic is sending.
-          //
            // if(p_data->notify.handle == bt_datahandle) // If notify coming from the data handle, send it to the UART port
-              uart_write_bytes(uart_num, (void*)p_data->notify.value, p_data->notify.value_len);
           //  else
           //    ESP_LOGI(GATTC_TAG, "ESP_GATTC_NOTIFY_EVT, receive unknown notify value:");
         } else {
@@ -565,7 +554,7 @@ void btc_connect(esp_bd_addr_t addr)
   char saddr[13];
   memcpy(rmtbtaddress, addr, sizeof(esp_bd_addr_t));
   printf("Connecting to %s\r\n", btaddrtostr(saddr,addr)); // TODO FIX ME
-  //esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, addr, BLE_ADDR_TYPE_RANDOM, true);
+  esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, addr, BLE_ADDR_TYPE_RANDOM, true);
 }
 
 void btc_disconnect()
@@ -614,5 +603,5 @@ void btcInit()
   // Try to connect to saved address on startup
   esp_bd_addr_t addr;
   strtobtaddr(addr, settings.rmtbtaddr);
-  btc_connect(addr);
+  //btc_connect(addr);
 }
