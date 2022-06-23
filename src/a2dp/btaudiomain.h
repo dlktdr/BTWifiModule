@@ -18,8 +18,8 @@
 #define BT_RC_CT_TAG          "RC_CT"
 
 /* device name */
-#define TARGET_DEVICE_NAME    "ESP_SPEAKER"
-#define LOCAL_DEVICE_NAME     "ESP_A2DP_SRC"
+#define TARGET_DEVICE_NAME    "DEWALT Speaker DCR006"
+#define LOCAL_DEVICE_NAME     "BTWifiModule"
 
 /* AVRCP used transaction label */
 #define APP_RC_CT_TL_GET_CAPS            (0)

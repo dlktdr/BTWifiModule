@@ -63,7 +63,7 @@ void bt_init()
     return;
   }
 
-  ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
+  ret = esp_bt_controller_enable(ESP_BT_MODE_BTDM);
   if (ret) {
     ESP_LOGE(LOG_BT, "%s enable controller failed: %s\n", __func__, esp_err_to_name(ret));
     return;

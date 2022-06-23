@@ -119,6 +119,7 @@ void filter_inquiry_scan_result(esp_bt_gap_cb_param_t *param)
     /* search for target device in its Extended Inqury Response */
     if (eir) {
         get_name_from_eir(eir, s_peer_bdname, NULL);
+        ESP_LOGI(BT_AV_TAG, "Device Addr %s Name %s", bda_str, s_peer_bdname);
         if (strcmp((char *)s_peer_bdname, TARGET_DEVICE_NAME) == 0) {
             ESP_LOGI(BT_AV_TAG, "Found a target device, address %s, name %s", bda_str, s_peer_bdname);
             s_a2d_state = APP_AV_STATE_DISCOVERED;
