@@ -4,6 +4,15 @@
 #include <nvs.h>
 
 #include "esp_log.h"
+#include "esp_bt.h"
+#include "a2dp/bt_app_core.h"
+#include "a2dp/btaudiomain.h"
+#include "esp_bt_main.h"
+#include "esp_bt_device.h"
+#include "esp_gap_bt_api.h"
+#include "esp_a2dp_api.h"
+#include "esp_avrc_api.h"
+
 #include "terminal.h"
 #include "frskybt.h"
 #include "cb.h"
@@ -201,6 +210,9 @@ void runUARTHead() {
     ESP_LOGE(LOG_UART, "Invalid role loaded, defaulting to central");
     settings.role = ROLE_BLE_CENTRAL;
   }
+
+  settings.role = ROLE_BLE_AUDIO; // REMOVE ME.. FORCE
+
   setRole(settings.role);
 
   char* data = (char*) malloc(UART_RX_BUFFER+1);
@@ -259,6 +271,7 @@ void setRole(role_t role)
   switch(curMode) {
     case ROLE_BLE_CENTRAL:
     case ROLE_BLE_PERIPHERAL:
+    case ROLE_BLE_AUDIO:
     default:
       break;
   }
@@ -279,6 +292,16 @@ void setRole(role_t role)
       bt_init();
       btpInit();
       break;
+    case ROLE_BLE_AUDIO:
+      bt_init();
+      esp_bt_pin_type_t pin_type = ESP_BT_PIN_TYPE_VARIABLE;
+      esp_bt_pin_code_t pin_code;
+      esp_bt_gap_set_pin(pin_type, 0, pin_code);
+
+      bt_app_task_start_up();
+      /* Bluetooth device name, connection mode and profile set up */
+      bt_app_work_dispatch(bt_av_hdl_stack_evt, BT_APP_STACK_UP_EVT, NULL, 0, NULL);
+      bta2dpInit();
     default:
       break;
   }
@@ -308,7 +331,6 @@ void runBTCentral()
       for(int i=laddcnt; i < bt_scanned_address_cnt; i++) {
         char addr[13];
         sprintf(reusablebuff, "OK+DISC:%s\r\n",btaddrtostr(addr, btc_scanned_addresses[i]));
-        //printf("%s",reusablebuff);
         uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
       }
       laddcnt = bt_scanned_address_cnt;

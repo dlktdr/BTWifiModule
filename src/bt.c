@@ -52,7 +52,7 @@ void bt_init()
   esp_err_t ret;
 
   if(!memreleased) {
-    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+    //ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
     memreleased = true;
   }
 
