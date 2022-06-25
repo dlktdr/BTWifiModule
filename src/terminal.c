@@ -140,6 +140,7 @@ void mainTask(void *stuff) {
     ESP_LOGE(LOG_UART, "Invalid role loaded, defaulting to central");
     settings.role = ROLE_BLE_CENTRAL;
   }
+  settings.role = ROLE_BLE_HID_JOYSTICK;
   setRole(settings.role);
 
   ESP_LOGI(LOG_UART, "Waiting for UART RX Task to start");
@@ -209,11 +210,10 @@ void setRole(role_t role)
       bt_init();
       btpInit();
       break;
-    case ROLE_BLE_JOYSTICK:
-      btPeripherialState = PERIPHERIAL_STATE_DISCONNECTED;
+    case ROLE_BLE_HID_JOYSTICK:
       bt_init();
-      //btjInit(); // TOOD
-
+      btjoyInit();
+      break;
     default:
       break;
   }
