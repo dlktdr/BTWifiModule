@@ -7,7 +7,7 @@ This code is for use on a ESP Wroom 32, it emulates a FRSky Bluetooth module but
 
 So far this has been tested on the PICO / WROOM32 and C3mini Boards. I would recommended to buy the listed boards in the external antenna versions if you plan on mounting inside a case, buy a adapter to RP-SMA mount this on your case and you can use a generic wifi antenna on the outside. These boards can be bought very cheaply, around $7 - $15 depending on the versions. The code isn't very large you can buy the cheapest 4Mb versions.
 
-Choosing the ESP32-C3-DEVKITM-1U board would be my choice at the moment, as it will be able to support the newer features of BT5.0, when available. https://www.digikey.ca/en/products/detail/espressif-systems/ESP32-C3-DEVKITM-1U/15198974 this link did come with an antenna when I ordered it, even though it doesn't show one.
+Choosing the ESP32-C3-DEVKITM-1U board would be my choice at the moment, as it will be able to support the newer features of BT5.0, when available. [Digikey Link](https://www.digikey.ca/en/products/detail/espressif-systems/ESP32-C3-DEVKITM-1U/15198974) See the Wiki Page for possible external antenna parts. [Boards and Hardware](https://github.com/dlktdr/BTWifiModule/wiki/Boards-and-Hardware)
 
 **NOTE** This is still a work in progress, there will be some issues. If you have any questions please ask in the HeadTracker **#dev** [Discord](https://discord.gg/ux5hEaNSPQ) or add an [issue](https://github.com/dlktdr/BTWifiModule/issues) here. 
 
