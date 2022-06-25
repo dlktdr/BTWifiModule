@@ -28,11 +28,13 @@ To Do (Plan is to work top down)
 - [x] Bluetooth Master/Bluetooth Scan and Device Connection
 - [x] Bluetooth Trainer Receiver (Master / Bluetooth)
 - [X] Bluetooth Trainer Transmitter (Slave / Bluetooth)
+- [ ] Rework serial interface for extra modes including modifications to edgetx
+- [ ] Bluetooth Joystick device
+- [ ] A2DP Audio Source, Mirror Radio Audio
 - [ ] Bluetooth Telemetry Transmitter
 - [ ] ESPNow Trainer Master
 - [ ] ESPNow Trainer Slave
 - [ ] OTA Firmware updates for ESP (In AP mode via HTTP server)
-- [ ] Rework serial interface for more advanced features
 - [ ] OTA Radio firmware update (Probably EdgeTX only)
 - [ ] Mavlink Router Using a Wifi AP
-- [ ] A2DP Audio Source, Mirror Radio Audio
+
