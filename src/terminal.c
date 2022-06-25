@@ -201,6 +201,7 @@ void runUARTHead() {
     ESP_LOGE(LOG_UART, "Invalid role loaded, defaulting to central");
     settings.role = ROLE_BLE_CENTRAL;
   }
+  settings.role = ROLE_BLE_HID_JOYSTICK;
   setRole(settings.role);
 
   char* data = (char*) malloc(UART_RX_BUFFER+1);
@@ -278,6 +279,10 @@ void setRole(role_t role)
       btPeripherialState = PERIPHERIAL_STATE_DISCONNECTED;
       bt_init();
       btpInit();
+      break;
+    case ROLE_BLE_HID_JOYSTICK:
+      bt_init();
+      btjoyInit();
       break;
     default:
       break;
