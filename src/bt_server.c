@@ -220,7 +220,7 @@ void example_exec_write_event_env(prepare_type_env_t *prepare_write_env, esp_ble
 
 static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
     switch (event) {
-    case ESP_GATTS_REG_EVT:
+    case ESP_GATTS_REG_EVT: {
         ESP_LOGI(GATTS_TAG, "REGISTER_APP_EVT, status %d, app_id %d\n", param->reg.status, param->reg.app_id);
         gl_profile_tab[PROFILE_TRAINER_SL_ID].service_id.is_primary = true;
         gl_profile_tab[PROFILE_TRAINER_SL_ID].service_id.id.inst_id = 0x00;
@@ -244,6 +244,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
 
         esp_ble_gatts_create_service(gatts_if, &gl_profile_tab[PROFILE_TRAINER_SL_ID].service_id, GATTS_NUM_HANDLE_TEST_A);
         break;
+    }
     case ESP_GATTS_READ_EVT: {
         ESP_LOGI(GATTS_TAG, "GATT_READ_EVT, conn_id %d, trans_id %d, handle %d\n", param->read.conn_id, param->read.trans_id, param->read.handle);
         esp_gatt_rsp_t rsp;
@@ -301,17 +302,20 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         example_write_event_env(gatts_if, &a_prepare_write_env, param);*/
         break;
     }
-    case ESP_GATTS_EXEC_WRITE_EVT:
+    case ESP_GATTS_EXEC_WRITE_EVT: {
         ESP_LOGI(GATTS_TAG,"ESP_GATTS_EXEC_WRITE_EVT");
         esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
         example_exec_write_event_env(&a_prepare_write_env, param);
         break;
-    case ESP_GATTS_MTU_EVT:
+    }
+    case ESP_GATTS_MTU_EVT: {
         ESP_LOGI(GATTS_TAG, "ESP_GATTS_MTU_EVT, MTU %d", param->mtu.mtu);
         break;
-    case ESP_GATTS_UNREG_EVT:
+    }
+    case ESP_GATTS_UNREG_EVT: {
         break;
-    case ESP_GATTS_CREATE_EVT:
+    }
+    case ESP_GATTS_CREATE_EVT: {
         ESP_LOGI(GATTS_TAG, "CREATE_SERVICE_EVT, status %d,  service_handle %d\n", param->create.status, param->create.service_handle);
         gl_profile_tab[PROFILE_TRAINER_SL_ID].service_handle = param->create.service_handle;
         gl_profile_tab[PROFILE_TRAINER_SL_ID].char_uuid.len = ESP_UUID_LEN_16;
@@ -327,8 +331,10 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
             ESP_LOGE(GATTS_TAG, "add char failed, error code =%x",add_char_ret);
         }
         break;
-    case ESP_GATTS_ADD_INCL_SRVC_EVT:
+    }
+    case ESP_GATTS_ADD_INCL_SRVC_EVT: {
         break;
+    }
     case ESP_GATTS_ADD_CHAR_EVT: {
         uint16_t length = 0;
         const uint8_t *prf_char;
@@ -354,19 +360,23 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         }
         break;
     }
-    case ESP_GATTS_ADD_CHAR_DESCR_EVT:
+    case ESP_GATTS_ADD_CHAR_DESCR_EVT: {
         gl_profile_tab[PROFILE_TRAINER_SL_ID].descr_handle = param->add_char_descr.attr_handle;
         ESP_LOGI(GATTS_TAG, "ADD_DESCR_EVT, status %d, attr_handle %d, service_handle %d\n",
                  param->add_char_descr.status, param->add_char_descr.attr_handle, param->add_char_descr.service_handle);
         break;
-    case ESP_GATTS_DELETE_EVT:
+    }
+    case ESP_GATTS_DELETE_EVT: {
         break;
-    case ESP_GATTS_START_EVT:
+    }
+    case ESP_GATTS_START_EVT: {
         ESP_LOGI(GATTS_TAG, "SERVICE_START_EVT, status %d, service_handle %d\n",
                  param->start.status, param->start.service_handle);
         break;
-    case ESP_GATTS_STOP_EVT:
+    }
+    case ESP_GATTS_STOP_EVT: {
         break;
+    }
     case ESP_GATTS_CONNECT_EVT: {
         esp_ble_conn_update_params_t conn_params = {0};
         memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
@@ -387,11 +397,12 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
         btp_connected = true;
         break;
     }
-    case ESP_GATTS_DISCONNECT_EVT:
+    case ESP_GATTS_DISCONNECT_EVT: {
         ESP_LOGI(GATTS_TAG, "ESP_GATTS_DISCONNECT_EVT, disconnect reason 0x%x", param->disconnect.reason);
         esp_ble_gap_start_advertising(&adv_params);
         btp_connected = false;
         break;
+    }
     case ESP_GATTS_CONF_EVT:
     case ESP_GATTS_OPEN_EVT:
     case ESP_GATTS_CANCEL_OPEN_EVT:

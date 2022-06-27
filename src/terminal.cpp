@@ -12,6 +12,8 @@
 #include "bt_server.h"
 #include "defines.h"
 #include "settings.h"
+#include "cobs.h"
+#include "crc.h"
 
 #define LOG_UART "UART"
 
@@ -55,109 +57,9 @@ char reusablebuff[REUSABLE_BUFFER];
 
 void sendBTMode()
 {
-  char lcladdress[13] = "000000000000";
-  btaddrtostr(lcladdress, localbtaddress);
-  ESP_LOGI(LOG_UART,"Local Addr %s", lcladdress);
-  if(curMode == ROLE_BLE_PERIPHERAL) {
-    snprintf(reusablebuff, sizeof(reusablebuff), "Peripheral:%s\r\n", lcladdress);
-    uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
-  } else if(curMode == ROLE_BLE_CENTRAL) {
-    snprintf(reusablebuff, sizeof(reusablebuff), "Central:%s\r\n", lcladdress);
-    uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
-  }
+
 }
 
-void parserATCommand(char atcommand[])
-{
-  // Strip trailing whitespace
-  bool done=false;
-  while(!done) {
-    int len = strlen(atcommand);
-    if(len > 0 && (atcommand[len-1] == '\n' || atcommand[len-1] == '\r'))
-      atcommand[len-1] = '\0';
-    else
-      done = true;
-  }
-
-  if(strncmp(atcommand, "+ROLE0", 6) == 0) {
-    ESP_LOGI(LOG_UART, "Setting role as Peripheral");
-    UART_WRITE_STRING(uart_num, "OK+Role:0\r\n");
-    setRole(ROLE_BLE_PERIPHERAL);
-    sendBTMode();
-
-  } else if (strncmp(atcommand, "+ROLE1", 6) == 0) {
-    ESP_LOGI(LOG_UART, "Setting role as Central");
-    UART_WRITE_STRING(uart_num, "OK+Role:1\r\n");
-    setRole(ROLE_BLE_CENTRAL);
-    sendBTMode();
-
-  } else if (strncmp(atcommand, "+CON", 4) == 0) {
-    if(curMode == ROLE_BLE_CENTRAL) {
-      // Connect to device specified
-      snprintf(reusablebuff, sizeof(reusablebuff), "OK+CONNA\r\nConnecting to:%s\r\n", atcommand + 4);
-      uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
-      // Store Remote Address to Connect to
-      strcpy(rmtaddress, atcommand + 4);
-      // Start connection
-      btCentralState = CENTRAL_STATE_CONNECT;
-    } else {
-      UART_WRITE_STRING(uart_num, "ERROR");
-    }
-
-  } else if (strncmp(atcommand, "+NAME", 5) == 0) {
-    ESP_LOGI(LOG_UART,"Setting Name to %s", atcommand + 5);
-    btSetName(atcommand + 5);
-    snprintf(reusablebuff, sizeof(reusablebuff), "OK+Name:%s\r\n", atcommand +5);
-    uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
-    sendBTMode();
-
-  } else if (strncmp(atcommand, "+TXPW", 5) == 0) {
-    ESP_LOGI(LOG_UART, "Setting Power to %s", atcommand + 5);
-    UART_WRITE_STRING(uart_num, "OK+Txpw:0\r\n");
-    sendBTMode();
-
-  } else if (strncmp(atcommand, "+DISC?", 6) == 0) {
-    if(curMode == ROLE_BLE_CENTRAL) {
-      ESP_LOGI(LOG_UART, "Discovery Requested");
-      UART_WRITE_STRING(uart_num, "OK+DISCS\r\n");
-      laddcnt = 0;
-      if(btCentralState != CENTRAL_STATE_SCAN_START &&
-         btCentralState != CENTRAL_STATE_SCANNING)
-        btCentralState = CENTRAL_STATE_SCAN_START;
-    }
-
-  } else if (strncmp(atcommand, "+CLEAR", 6) == 0) {
-    if(curMode == ROLE_BLE_CENTRAL) {
-      btCentralState = CENTRAL_STATE_DISCONNECT;
-      UART_WRITE_STRING(uart_num, "OK+CLEAR\r\n");
-    }
-
-  } else if (strncmp(atcommand, "+BAUD", 5) == 0) {
-    strncpy(reusablebuff, &atcommand[6], sizeof(reusablebuff));
-    int baudrate = atoi(reusablebuff);
-    ESP_LOGI(LOG_UART, "Baud Rate Change Requested to %d", baudrate);
-
-    baudTimer = esp_timer_get_time() + BAUD_RESET_TIMER;
-    //setBaudRate(baudrate); TODO
-    //UART_WRITE_STRING(uart_num, "OK+BAUD\r\n");
-
-    // TO DO: We need to check if the new baud worked. If the above timer elapses
-    // before an AT+ACK or something is seen. Then revert back to the default
-    // baud
-
-  } else if (strncmp(atcommand, "+HTRESET", 8) == 0) {
-    if(btc_board_type == BLE_BOARD_HEADTRACKER) {
-      ESP_LOGI(LOG_UART, "Reset Head Tracker Requested");
-      UART_WRITE_STRING(uart_num, "OK+HTRESET\r\n");
-      btc_dohtreset();
-    } else {
-      UART_WRITE_STRING(uart_num, "ERROR");
-    }
-
-  } else {
-    ESP_LOGE(LOG_UART, "Unknown AT Cmd: %s", atcommand);
-  }
-}
 
 // Ticks to wait for data stream to come in
 
@@ -170,19 +72,18 @@ uart_config_t uart_config = {
     .source_clk = UART_SCLK_APB,
 };
 
-void setBaudRate(uint32_t baudRate)
-{
-  if(baudRate < BAUD_DEFAULT || baudRate > BAUD_MAXIMUM) return;
-  uart_config.baud_rate = baudRate;
-  ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
-}
 
 char atcommand[AT_CMD_MAX_LEN];
 int atcommandlen=-1;
 
 circular_buffer uartinbuf;
 
-void runUARTHead() {
+void processPacket(packet_s &packet)
+{
+
+}
+
+void runUARTHead(void *stuff) {
   // Setup UART Port
   ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
   ESP_ERROR_CHECK(uart_driver_install(uart_num, UART_RX_BUFFER * 2,
@@ -209,38 +110,29 @@ void runUARTHead() {
     for(;;) {}
   }
 
+  packet_s packet;
   while (1) {
+    uint8_t encodedbuffer[270];
+
     int cnt = uart_read_bytes(uart_num, data, UART_RX_BUFFER, 0);
-    for (int i = 0; i < cnt; i++)
+    for (int i = 0; i < cnt; i++) {
       cb_push_back(&uartinbuf, &data[i]);
+      if(&data[i] == 0) {
+        ESP_LOGI(LOG_UART,"PacketFound");
 
-    char c;
-    while (!cb_pop_front(&uartinbuf, &c)) {
-      if (atcommandlen >= 0) {
-        atcommand[atcommandlen++] = c;
-        // Check for buffer overflow
-        if(atcommandlen >= sizeof(atcommand)-1) {
-          ESP_LOGE(LOG_UART, "AT Command Buffer Overflow");
-          atcommandlen = -1;
-          continue;
+        // Pull the packet out of the buffer
+        char c;
+        char *ptr = (char*)encodedbuffer;
+        int len=0;
+        while (!cb_pop_front(&uartinbuf, &c)) {
+          *ptr++ = c;
+          len++;
+          if(len == sizeof(encodedbuffer))
+            break;
         }
-        // AT Command Termination
-        if(c == '\n') {
-          atcommand[atcommandlen] = '\0';
-          parserATCommand(atcommand);
-          atcommandlen = -1;
-        }
-      } else {
-        // Scan for characters AT in the byte stream
-        static char lc=0;
-        if(lc == 'A' && c == 'T') {
-          atcommandlen = 0;
-        } else {
-          frSkyProcessByte(c);
-        }
-
-        lc = c;
+        COBS::decode(encodedbuffer,len,(uint8_t *)&packet);
       }
+      cb_clear(&uartinbuf); // Clear the buffer
     }
 
     runBT();
@@ -406,4 +298,22 @@ void runBT()
     default:
       break;
   }
+}
+
+void write(const uint8_t *dat, int len, bool iscmd, int id)
+{
+  uint8_t encodedbuffer[sizeof(packet_s) + 1];
+  packet_s packet;
+  packet.type = id;
+  packet.type |= (iscmd << ESP_PACKET_CMD_BIT);
+  packet.len = len;
+  packet.crc = 0xAABB;
+  memcpy(packet.data, dat, len); // TODO, Remove me, extra copy for just the crc calc.
+  packet.crc = crc16(0,(uint8_t *)&packet,len + PACKET_OVERHEAD);
+  int wl = COBS::encode((uint8_t *)&packet, packet.len + PACKET_OVERHEAD, encodedbuffer);
+
+  encodedbuffer[wl] = '\0'; // Null terminate packet, used for detection of packet end
+
+  // Write the packet
+  uart_write_bytes(uart_num, (uint8_t *)&packet, wl+1);
 }

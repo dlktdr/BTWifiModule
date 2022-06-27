@@ -47,8 +47,6 @@
 #define PROFILE_A_APP_ID 0
 #define INVALID_HANDLE   0
 
-char *str_ble_board_types[BLE_BOARD_COUNT] = {"Unknown","CC2540","PARA","HeadTracker","FlySky"};
-
 static bool get_server = false;
 static esp_gattc_char_elem_t *char_elem_result   = NULL;
 static esp_gattc_descr_elem_t *descr_elem_result = NULL;
@@ -139,13 +137,14 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
     esp_ble_gattc_cb_param_t *p_data = (esp_ble_gattc_cb_param_t *)param;
 
     switch (event) {
-    case ESP_GATTC_REG_EVT:
+    case ESP_GATTC_REG_EVT: {
         ESP_LOGI(GATTC_TAG, "REG_EVT");
         esp_err_t scan_ret = esp_ble_gap_set_scan_params(&ble_scan_params);
         if (scan_ret){
             ESP_LOGE(GATTC_TAG, "set scan params error, error code = %x", scan_ret);
         }
         break;
+    }
     case ESP_GATTC_CONNECT_EVT:{
         btc_connected = true;
         esp_ble_conn_update_params_t conn_params = {0};
@@ -171,14 +170,15 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
 
         break;
     }
-    case ESP_GATTC_OPEN_EVT:
+    case ESP_GATTC_OPEN_EVT: {
         if (param->open.status != ESP_GATT_OK){
             ESP_LOGE(GATTC_TAG, "open failed, status %d", p_data->open.status);
             break;
         }
         ESP_LOGI(GATTC_TAG, "open success");
         break;
-    case ESP_GATTC_DIS_SRVC_CMPL_EVT:
+    }
+    case ESP_GATTC_DIS_SRVC_CMPL_EVT: {
         if (param->dis_srvc_cmpl.status != ESP_GATT_OK){
             ESP_LOGE(GATTC_TAG, "discover service failed, status %d", param->dis_srvc_cmpl.status);
             break;
@@ -186,12 +186,14 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         ESP_LOGI(GATTC_TAG, "discover service complete conn_id %d", param->dis_srvc_cmpl.conn_id);
         esp_ble_gattc_search_service(gattc_if, param->cfg_mtu.conn_id, &remote_filter_service_uuid);
         break;
-    case ESP_GATTC_CFG_MTU_EVT:
+    }
+    case ESP_GATTC_CFG_MTU_EVT: {
         if (param->cfg_mtu.status != ESP_GATT_OK){
             ESP_LOGE(GATTC_TAG,"config mtu failed, error status = %x", param->cfg_mtu.status);
         }
         ESP_LOGI(GATTC_TAG, "ESP_GATTC_CFG_MTU_EVT, Status %d, MTU %d, conn_id %d", param->cfg_mtu.status, param->cfg_mtu.mtu, param->cfg_mtu.conn_id);
         break;
+    }
     case ESP_GATTC_SEARCH_RES_EVT: {
         ESP_LOGI(GATTC_TAG, "SEARCH RES: conn_id = %x is primary service %d", p_data->search_res.conn_id, p_data->search_res.is_primary);
         ESP_LOGI(GATTC_TAG, "start handle %d end handle %d current handle value %d", p_data->search_res.start_handle, p_data->search_res.end_handle, p_data->search_res.srvc_id.inst_id);
@@ -204,7 +206,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         }
         break;
     }
-    case ESP_GATTC_SEARCH_CMPL_EVT:
+    case ESP_GATTC_SEARCH_CMPL_EVT: {
         if (p_data->search_cmpl.status != ESP_GATT_OK){
             ESP_LOGE(GATTC_TAG, "search service failed, error status = %x", p_data->search_cmpl.status);
             break;
@@ -287,6 +289,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
             }
         }
          break;
+    }
     case ESP_GATTC_REG_FOR_NOTIFY_EVT: {
         ESP_LOGI(GATTC_TAG, "ESP_GATTC_REG_FOR_NOTIFY_EVT");
         if (p_data->reg_for_notify.status != ESP_GATT_OK){
@@ -320,7 +323,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
                     }
                     /* Every char has only one descriptor in our 'ESP_GATTS_DEMO' demo, so we used first 'descr_elem_result' */
                     if (count > 0 && descr_elem_result[0].uuid.len == ESP_UUID_LEN_16 && descr_elem_result[0].uuid.uuid.uuid16 == ESP_GATT_UUID_CHAR_CLIENT_CONFIG){
-                        ret_status = esp_ble_gattc_write_char_descr( gattc_if,
+                        ret_status = (esp_gatt_status_t)esp_ble_gattc_write_char_descr( gattc_if,
                                                                      gl_profile_tab[PROFILE_A_APP_ID].conn_id,
                                                                      descr_elem_result[0].handle,
                                                                      sizeof(notify_en),
@@ -344,7 +347,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         }
         break;
     }
-    case ESP_GATTC_NOTIFY_EVT:
+    case ESP_GATTC_NOTIFY_EVT: {
         if (p_data->notify.is_notify) {
           // TODO, verify what characteristic is being notified
 #ifdef DEBUG_TIMERS
@@ -360,7 +363,8 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         }
 
         break;
-    case ESP_GATTC_WRITE_DESCR_EVT:
+    }
+    case ESP_GATTC_WRITE_DESCR_EVT: {
         if (p_data->write.status != ESP_GATT_OK){
             ESP_LOGE(GATTC_TAG, "write descr failed, error status = %x", p_data->write.status);
             break;
@@ -379,6 +383,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
                                   ESP_GATT_WRITE_TYPE_RSP,
                                   ESP_GATT_AUTH_REQ_NONE);
         break;
+    }
     case ESP_GATTC_SRVC_CHG_EVT: {
         esp_bd_addr_t bda;
         memcpy(bda, p_data->srvc_chg.remote_bda, sizeof(esp_bd_addr_t));
@@ -386,20 +391,23 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         esp_log_buffer_hex(GATTC_TAG, bda, sizeof(esp_bd_addr_t));
         break;
     }
-    case ESP_GATTC_WRITE_CHAR_EVT:
+    case ESP_GATTC_WRITE_CHAR_EVT: {
         if (p_data->write.status != ESP_GATT_OK){
             ESP_LOGE(GATTC_TAG, "write char failed, error status = %x", p_data->write.status);
             break;
         }
         ESP_LOGI(GATTC_TAG, "write char success ");
         break;
-    case ESP_GATTC_DISCONNECT_EVT:
+    }
+    case ESP_GATTC_DISCONNECT_EVT: {
         btc_connected = false;
         get_server = false;
         ESP_LOGI(GATTC_TAG, "ESP_GATTC_DISCONNECT_EVT, reason = %d", p_data->disconnect.reason);
         break;
-    default:
+    }
+    default: {
         break;
+    }
     }
 }
 

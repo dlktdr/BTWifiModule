@@ -44,6 +44,7 @@ void runBlinky() {
 }
 #endif
 
+extern "C" {
 void app_main(void) {
 
   TaskHandle_t tUartHnd = NULL;
@@ -70,4 +71,5 @@ void app_main(void) {
   ESP_ERROR_CHECK(nvs_open("btwifi",NVS_READWRITE, &nvs_flsh_btw));
 
   loadSettings();
+}
 }

@@ -4,6 +4,8 @@
 
 #define BT_PAUSE_BEFORE_RESTART 250 //ms
 
+
+
 extern esp_bd_addr_t rmtbtaddress;
 extern esp_bd_addr_t localbtaddress;
 extern char btname[];
@@ -13,3 +15,4 @@ char *btaddrtostr(char dest[13], esp_bd_addr_t src);
 void bt_disable();
 void bt_init();
 void btSetName(const char *name);
+
