@@ -3,14 +3,15 @@
 #include "defines.h"
 
 // Packet Format
-typedef struct {
-  uint8_t len;       // Data length. Max 255 per packet
+typedef struct PACKED {
   uint8_t type;
-  uint16_t crc;      // CRC16:xxxx of the packet
+  uint8_t crcl;      // CRC16:low byte
+  uint8_t crch;      // CRC16:high byte
   uint8_t data[257]; // User Data
+  uint8_t len;       // Data length, not transmitted
 } packet_s;
 
-#define PACKET_OVERHEAD 4
+#define PACKET_OVERHEAD 3
 
 /* Packet Type Format
  * Bits 0:4 - Type(32 Possible ESPModes, Mode 0=Base Module)

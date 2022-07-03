@@ -10,10 +10,7 @@
 #include "esp_bt_main.h"
 #include "esp_log.h"
 #include "freertos/task.h"
-
-extern "C" {
 #include "bt.h"
-};
 
 #define LOG_BT "BT"
 #define MAX_BTNAME_LEN 50
@@ -23,7 +20,6 @@ esp_bd_addr_t rmtbtaddress;
 
 char btname[MAX_BTNAME_LEN] = "Hello";
 
-extern "C" {
 void strtobtaddr(esp_bd_addr_t dest, char *src)
 {
   for(int i=0; i < 6; i++) {
@@ -105,4 +101,3 @@ void btSetName(const char *name)
   btname[sizeof(btname)-1] = '\0';
   ESP_LOGI(LOG_BT,"Setting BT Name %s", name);
 }
-};

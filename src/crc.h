@@ -31,7 +31,7 @@ enum {
 
 uint8_t crc8(const uint8_t * ptr, uint32_t len);
 uint8_t crc8_BA(const uint8_t * ptr, uint32_t len);
-uint16_t crc16(uint8_t index, const uint8_t * buf, uint32_t len, uint16_t start = 0);
+uint16_t crc16(uint8_t index, const uint8_t * buf, uint32_t len, uint16_t start);
 
 // CRC16 implementation according to CCITT standards
 static const unsigned short crc16tab_1021[256] = {

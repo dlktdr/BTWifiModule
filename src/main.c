@@ -44,9 +44,8 @@ void runBlinky() {
 }
 #endif
 
-extern "C" {
-void app_main(void) {
-
+void app_main(void)
+{
   TaskHandle_t tUartHnd = NULL;
   xTaskCreate(runUARTHead, "UART", 4096, NULL, tskIDLE_PRIORITY+2, &tUartHnd);
   configASSERT(tUartHnd);
@@ -71,5 +70,4 @@ void app_main(void) {
   ESP_ERROR_CHECK(nvs_open("btwifi",NVS_READWRITE, &nvs_flsh_btw));
 
   loadSettings();
-}
 }

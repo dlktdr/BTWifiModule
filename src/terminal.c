@@ -15,6 +15,9 @@
 #include "cobs.h"
 #include "crc.h"
 
+#include "esproot.h"
+#include "esptrainer.h"
+
 #define LOG_UART "UART"
 
 #define UART_RX_BUFFER 512
@@ -78,10 +81,54 @@ int atcommandlen=-1;
 
 circular_buffer uartinbuf;
 
-void processPacket(packet_s &packet)
-{
+enum ESPModes {
+  ESP_ROOT,
+  ESP_TELEMETRY,
+  ESP_TRAINER,
+  ESP_JOYSTICK,
+  ESP_AUDIO,
+  ESP_FTP,
+  ESP_IMU,
+  ESP_MAX
+};
 
+#define ESP_BASE 0
+#define ESP_PACKET_TYPE_MSK 0x0F
+#define ESP_PACKET_CMD_BIT 6
+#define ESP_PACKET_ACK_BIT 7
+#define ESP_PACKET_ISCMD(t) (t&(1<<ESP_PACKET_CMD_BIT))
+#define ESP_PACKET_ISACKREQ(t) (t&(1<<ESP_PACKET_ACK_BIT))
+
+void processPacket(const packet_s *packet)
+{
+  switch(packet->type & ESP_PACKET_TYPE_MSK) {
+    case ESP_ROOT:
+      if(ESP_PACKET_ISCMD(packet->type))
+        espRootCommand(packet->data[0], packet->data + 1, packet->len -1);
+      else
+        espRootData(packet->data, packet->len);
+      break;
+    case ESP_TELEMETRY:
+      break;
+    case ESP_TRAINER:
+      if(ESP_PACKET_ISCMD(packet->type))
+        espTrainerCommand(packet->data[0], packet->data + 1, packet->len -1);
+      else
+        espTrainerData(packet->data, packet->len);
+      break;
+      break;
+    case ESP_JOYSTICK:
+      break;
+    case ESP_AUDIO:
+      break;
+    case ESP_FTP:
+      break;
+    case ESP_IMU:
+      break;
+  }
 }
+
+#define PACKED_BUFFERS 5
 
 void runUARTHead(void *stuff) {
   // Setup UART Port
@@ -112,28 +159,42 @@ void runUARTHead(void *stuff) {
 
   packet_s packet;
   while (1) {
-    uint8_t encodedbuffer[270];
-
+    uint8_t encodedbuffer[270] = "\0";
     int cnt = uart_read_bytes(uart_num, data, UART_RX_BUFFER, 0);
+    // Room for improvment, don't write to the cb
     for (int i = 0; i < cnt; i++) {
-      cb_push_back(&uartinbuf, &data[i]);
-      if(&data[i] == 0) {
-        ESP_LOGI(LOG_UART,"PacketFound");
-
-        // Pull the packet out of the buffer
+      cb_push_back(&uartinbuf, data + i);
+      if(data[i] == 0) {
         char c;
         char *ptr = (char*)encodedbuffer;
         int len=0;
         while (!cb_pop_front(&uartinbuf, &c)) {
           *ptr++ = c;
           len++;
-          if(len == sizeof(encodedbuffer))
+          if(len == sizeof(encodedbuffer)) {
+            ESP_LOGE("UartRX", "Buffer overflow");
             break;
+          }
         }
-        COBS::decode(encodedbuffer,len,(uint8_t *)&packet);
+//        ESP_LOG_BUFFER_HEX("EBL", encodedbuffer, len);
+        int lenout = cobs_decode(encodedbuffer,len,(uint8_t *)&packet);
+//        ESP_LOG_BUFFER_HEX("P", (uint8_t *)&packet, lenout);
+        uint16_t packetcrc = packet.crcl | (packet.crch << 8); // Store transmitted packet
+        packet.crcl = 0xBB;
+        packet.crch = 0xAA;
+        uint16_t calccrc = crc16(0,(uint8_t *)&packet,lenout - 1, 0);
+        packet.len = lenout - PACKET_OVERHEAD - 1;
+//        printf("in %d out %d data %d\r\n", len, lenout, packet.len);
+        if(packetcrc == calccrc) {
+          // Successful packet, parse it
+          processPacket(&packet);
+        } else {
+          ESP_LOGE("PM", "CRC Fault");
+        }
+        cb_clear(&uartinbuf); // Clear the buffer
       }
-      cb_clear(&uartinbuf); // Clear the buffer
     }
+    //uart_write_bytes(uart_num,"Hello\n",7);
 
     runBT();
     vTaskDelay(1);
@@ -239,8 +300,8 @@ void runBTCentral()
           uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
           sprintf(reusablebuff, "MTU Size:65\r\nMTU Size: 65\r\nPHT Update Complete\r\nCurrent PHY:2M\r\n"); // Fix me
           uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
-          sprintf(reusablebuff, "Board:%s\r\n", str_ble_board_types[btc_board_type]);
-          uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
+//          sprintf(reusablebuff, "Board:%s\r\n", str_ble_board_types[btc_board_type]);
+//          uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
           btCentralState = CENTRAL_STATE_CONNECTED;
           // TODO: Add
 
@@ -306,11 +367,13 @@ void write(const uint8_t *dat, int len, bool iscmd, int id)
   packet_s packet;
   packet.type = id;
   packet.type |= (iscmd << ESP_PACKET_CMD_BIT);
-  packet.len = len;
-  packet.crc = 0xAABB;
+  packet.crcl = 0xBB;
+  packet.crch = 0xAA;
   memcpy(packet.data, dat, len); // TODO, Remove me, extra copy for just the crc calc.
-  packet.crc = crc16(0,(uint8_t *)&packet,len + PACKET_OVERHEAD);
-  int wl = COBS::encode((uint8_t *)&packet, packet.len + PACKET_OVERHEAD, encodedbuffer);
+  uint16_t crc = crc16(0, (uint8_t *)&packet,len + PACKET_OVERHEAD, 0);
+  packet.crcl = crc & 0xFF;
+  packet.crch = (crc & 0xFF00) >> 8;
+  int wl = cobs_encode((uint8_t *)&packet, packet.len + PACKET_OVERHEAD, encodedbuffer);
 
   encodedbuffer[wl] = '\0'; // Null terminate packet, used for detection of packet end
 

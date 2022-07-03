@@ -30,7 +30,7 @@
 #define UART_RX_BUFFER 512
 #define UART_TX_BUFFER 512
 #define BAUD_RESET_TIMER 1000000 // us
-#define BAUD_DEFAULT 57600
+#define BAUD_DEFAULT 576000
 #define BAUD_MAXIMUM 921600
 
 // Optional Debugging Options
