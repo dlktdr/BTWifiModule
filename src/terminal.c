@@ -133,8 +133,8 @@ void processPacket(const packet_s *packet)
 void runUARTHead(void *stuff) {
   // Setup UART Port
   ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
-  ESP_ERROR_CHECK(uart_driver_install(uart_num, UART_RX_BUFFER * 2,
-                                      UART_RX_BUFFER * 2, 0, NULL, 0));
+  ESP_ERROR_CHECK(uart_driver_install(uart_num, UART_RX_BUFFER * 4,
+                                      UART_RX_BUFFER * 4, 0, NULL, 0));
   ESP_ERROR_CHECK(uart_set_pin(uart_num, UART_TXPIN,
                                          UART_RXPIN,
                                          UART_PIN_NO_CHANGE,
@@ -159,11 +159,13 @@ void runUARTHead(void *stuff) {
 
   packet_s packet;
   while (1) {
-    uint8_t encodedbuffer[270] = "\0";
+    uint8_t encodedbuffer[UART_RX_BUFFER];
     int cnt = uart_read_bytes(uart_num, data, UART_RX_BUFFER, 0);
-    // Room for improvment, don't write to the cb
+
     for (int i = 0; i < cnt; i++) {
-      cb_push_back(&uartinbuf, data + i);
+      if(!cb_push_back(&uartinbuf, data + i)) {
+        ESP_LOGE("UartRX", "Circular buffer full");
+      }
       if(data[i] == 0) {
         char c;
         char *ptr = (char*)encodedbuffer;
@@ -176,6 +178,8 @@ void runUARTHead(void *stuff) {
             break;
           }
         }
+        cb_clear(&uartinbuf); // Clear the buffer
+
 //        ESP_LOG_BUFFER_HEX("EBL", encodedbuffer, len);
         int lenout = cobs_decode(encodedbuffer,len,(uint8_t *)&packet);
 //        ESP_LOG_BUFFER_HEX("P", (uint8_t *)&packet, lenout);
@@ -191,12 +195,12 @@ void runUARTHead(void *stuff) {
         } else {
           ESP_LOGE("PM", "CRC Fault");
         }
-        cb_clear(&uartinbuf); // Clear the buffer
+
       }
     }
     //uart_write_bytes(uart_num,"Hello\n",7);
 
-    runBT();
+//    runBT();
     vTaskDelay(1);
   }
   free(data);

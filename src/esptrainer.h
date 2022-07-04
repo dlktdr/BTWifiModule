@@ -8,5 +8,5 @@ enum ESPTrainerCmds {
   ESP_TRAINERCMD_COUNT,
 };
 
-void espTrainerData(const char *data, uint8_t len);
+void espTrainerData(const uint8_t *data, uint8_t len);
 void espTrainerCommand(uint8_t command, const uint8_t *data, uint8_t len);

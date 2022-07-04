@@ -3,12 +3,21 @@
 
 #define LOGS "TRNR"
 
-void espTrainerData(const char *data, uint8_t len)
+// Channel Format
+typedef struct  {
+  int16_t ch[32];
+  uint32_t channelmask; // Valid Channels
+} channeldata;
+
+
+void espTrainerData(const uint8_t *data, uint8_t len)
 {
-  ESP_LOGI(LOGS, "p");
+  printf("d\r\n");
+//  ESP_LOGI(LOGS, "%d", len);
 }
 
 void espTrainerCommand(uint8_t command, const uint8_t *data, uint8_t len)
 {
-  ESP_LOGI(LOGS, "I got a command %d", command);
+  printf("c\r\n");
+//  ESP_LOGI(LOGS, "%d", command);
 }
