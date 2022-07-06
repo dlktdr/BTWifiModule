@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "esp_log.h"
+#include "bt_joystick.h"
 
 // HID keyboard input report length
 #define HID_KEYBOARD_IN_RPT_LEN     8
@@ -95,55 +96,6 @@ uint16_t esp_hidd_get_version(void)
 	return HIDD_VERSION;
 }
 
-void esp_hidd_send_consumer_value(uint16_t conn_id, uint8_t key_cmd, bool key_pressed)
-{
-    uint8_t buffer[HID_CC_IN_RPT_LEN] = {0, 0};
-    if (key_pressed) {
-        ESP_LOGD(HID_LE_PRF_TAG, "hid_consumer_build_report");
-        hid_consumer_build_report(buffer, key_cmd);
-    }
-    ESP_LOGD(HID_LE_PRF_TAG, "buffer[0] = %x, buffer[1] = %x", buffer[0], buffer[1]);
-    hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
-                        HID_RPT_ID_CC_IN, HID_REPORT_TYPE_INPUT, HID_CC_IN_RPT_LEN, buffer);
-    return;
-}
-
-void esp_hidd_send_keyboard_value(uint16_t conn_id, key_mask_t special_key_mask, uint8_t *keyboard_cmd, uint8_t num_key)
-{
-    if (num_key > HID_KEYBOARD_IN_RPT_LEN - 2) {
-        ESP_LOGE(HID_LE_PRF_TAG, "%s(), the number key should not be more than %d", __func__, HID_KEYBOARD_IN_RPT_LEN);
-        return;
-    }
-
-    uint8_t buffer[HID_KEYBOARD_IN_RPT_LEN] = {0};
-
-    buffer[0] = special_key_mask;
-
-    for (int i = 0; i < num_key; i++) {
-        buffer[i+2] = keyboard_cmd[i];
-    }
-
-    ESP_LOGD(HID_LE_PRF_TAG, "the key vaule = %d,%d,%d, %d, %d, %d,%d, %d", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
-    hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
-                        HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, buffer);
-    return;
-}
-
-void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mickeys_x, int8_t mickeys_y)
-{
-    uint8_t buffer[HID_MOUSE_IN_RPT_LEN];
-
-    buffer[0] = mouse_button;   // Buttons
-    buffer[1] = mickeys_x;           // X
-    buffer[2] = mickeys_y;           // Y
-    buffer[3] = 0;           // Wheel
-    buffer[4] = 0;           // AC Pan
-
-    hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
-                        HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, HID_MOUSE_IN_RPT_LEN, buffer);
-    return;
-}
-
 // -------------------------------------
 // From - Head Tracker Code joystick.cpp
 
@@ -151,16 +103,18 @@ void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mi
 #define JOYSTICK_BUTTON_HIGH 1750
 #define JOYSTICK_BUTTON_LOW 1250
 
-struct {
+struct PACKED {
 #ifdef JOYSTICK_BUTTONS
     uint8_t but[2];
 #endif
-    uint16_t channels[8];
+    uint8_t channels[16];
 } report;
 
-void set_JoystickChannels(uint16_t chans[16])
+void hid_SendJoystickChannels(uint16_t chans[8])
 {
-    memcpy(report.channels, chans, sizeof(report.channels));
+  uint16_t conn_id = btj_conn_id;
+  ESP_LOGI("JOY","Sending HID Report ch0 - %d", chans[0]);  
+  memcpy(report.channels, chans, sizeof(report.channels));
 
 #ifdef JOYSTICK_BUTTONS
     report.but[0] = 0;
@@ -183,58 +137,10 @@ void set_JoystickChannels(uint16_t chans[16])
         }
 #endif
 
-        report.channels[i] -= 988; // Shift from center so it's 0-1024
+        report.channels[i] -= 988; // Shift from center so it's 0-1024        
     }
 
-    hid_int_ep_write(hdev, (uint8_t*)&report, sizeof(report), NULL);
-}
-
-static const uint8_t hid_report_desc[] = {
-    0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
-    0x09, 0x05,                    //     USAGE (Game Pad)
-    0xa1, 0x01,                    //     COLLECTION (Application)
-    0xa1, 0x00,                    //       COLLECTION (Physical)
-#ifdef JOYSTICK_BUTTONS
-    0x05, 0x09,                    //         USAGE_PAGE (Button)
-    0x19, 0x01,                    //         USAGE_MINIMUM (Button 1)
-    0x29, 0x10,                    //         USAGE_MAXIMUM (Button 8)
-    0x15, 0x00,                    //         LOGICAL_MINIMUM (0)
-    0x25, 0x01,                    //         LOGICAL_MAXIMUM (1)
-    0x95, 0x10,                    //         REPORT_COUNT (8)
-    0x75, 0x01,                    //         REPORT_SIZE (1)
-    0x81, 0x02,                    //         INPUT (Data,Var,Abs)
-#endif
-    0x05, 0x01,                    //         USAGE_PAGE (Generic Desktop)
-    0x09, 0x30,                    //         USAGE (X)
-    0x09, 0x31,                    //         USAGE (Y)
-    0x09, 0x32,                    //         USAGE (Z)
-    0x09, 0x33,                    //         USAGE (Rx)
-    0x09, 0x34,                    //         USAGE (Ry)
-    0x09, 0x35,                    //         USAGE (Rz)
-    0x09, 0x36,                    //         USAGE (Slider)
-    0x09, 0x36,                    //         USAGE (Slider)
-    0x16, 0x00, 0x00,              //         LOGICAL_MINIMUM (0)
-    0x26, 0xFF, 0x03,              //         LOGICAL_MAXIMUM (1024)
-    0x75, 0x10,                    //         REPORT_SIZE (16)
-    0x95, 0x08,                    //         REPORT_COUNT (8)
-    0x81, 0x02,                    //         INPUT (Data,Var,Abs)
-    0xc0,                          //       END_COLLECTION
-    0xc0                           //     END_COLLECTION
-};
-
-void esp_hidd_send_joystick_value(uint16_t conn_id, uint16_t joystick_buttons, uint8_t joystick_x, uint8_t joystick_y, uint8_t joystick_z, uint8_t joystick_rx)
-{
-    uint8_t buffer[HID_GAMEPAD_IN_RPT_LEN];
-    ESP_LOGD(HID_LE_PRF_TAG, "the buttons value = %d js1 = %d, %d js2 = %d, %d", joystick_buttons, joystick_x, joystick_y, joystick_z, joystick_rx);
-
-    buffer[0]=joystick_buttons & 0xff;
-    buffer[1] = ( joystick_buttons >> 8);
-    buffer[2] = ( joystick_x ^ 0x80 );    // X
-    buffer[3] = (( joystick_y ^ 0x80 ) * -1) - 1;    // Y
-    buffer[4] = ( joystick_z ^ 0x80 );    // X
-    buffer[5] = (( joystick_rx ^ 0x80 ) * -1) - 1;   // Y
-
     hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
-                        HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, HID_GAMEPAD_IN_RPT_LEN, buffer);
-    return;
+                        HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, sizeof(report), (uint8_t*)&report);
 }
+

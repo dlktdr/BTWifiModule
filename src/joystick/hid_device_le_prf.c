@@ -34,9 +34,45 @@ struct prf_char_pres_fmt
 // HID report mapping table
 static hid_report_map_t hid_rpt_map[HID_NUM_REPORTS];
 
+#define JOYSTICK_BUTTONS
+
+static const uint8_t hidReportMap[] = {
+    0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
+    0x09, 0x05,                    //     USAGE (Game Pad)
+    0xa1, 0x01,                    //     COLLECTION (Application)
+    0xa1, 0x00,                    //       COLLECTION (Physical)
+#ifdef JOYSTICK_BUTTONS
+    0x05, 0x09,                    //         USAGE_PAGE (Button)
+    0x19, 0x01,                    //         USAGE_MINIMUM (Button 1)
+    0x29, 0x10,                    //         USAGE_MAXIMUM (Button 8)
+    0x15, 0x00,                    //         LOGICAL_MINIMUM (0)
+    0x25, 0x01,                    //         LOGICAL_MAXIMUM (1)
+    0x95, 0x10,                    //         REPORT_COUNT (8)
+    0x75, 0x01,                    //         REPORT_SIZE (1)
+    0x81, 0x02,                    //         INPUT (Data,Var,Abs)
+#endif
+    0x05, 0x01,                    //         USAGE_PAGE (Generic Desktop)
+    0x09, 0x30,                    //         USAGE (X)
+    0x09, 0x31,                    //         USAGE (Y)
+    0x09, 0x32,                    //         USAGE (Z)
+    0x09, 0x33,                    //         USAGE (Rx)
+    0x09, 0x34,                    //         USAGE (Ry)
+    0x09, 0x35,                    //         USAGE (Rz)
+    0x09, 0x36,                    //         USAGE (Slider)
+    0x09, 0x36,                    //         USAGE (Slider)
+    0x16, 0x00, 0x00,              //         LOGICAL_MINIMUM (0)
+    0x26, 0xFF, 0x03,              //         LOGICAL_MAXIMUM (1024)
+    0x75, 0x10,                    //         REPORT_SIZE (16)
+    0x95, 0x08,                    //         REPORT_COUNT (8)
+    0x81, 0x02,                    //         INPUT (Data,Var,Abs)
+    0xc0,                          //       END_COLLECTION
+    0xc0                           //     END_COLLECTION
+};
+
+
 // HID Report Map characteristic value
 // Keyboard report descriptor (using format for Boot interface descriptor)
-static const uint8_t hidReportMap[] = {
+/*static const uint8_t hidReportMap[] = {
     0x05, 0x01,  // Usage Page (Generic Desktop)
     0x09, 0x02,  // Usage (Mouse)
     0xA1, 0x01,  // Collection (Application)
@@ -183,7 +219,7 @@ static const uint8_t hidReportMap[] = {
     0xC0,         // End Collection
 #endif
 
-};
+};*/
 
 /// Battery Service Attributes Indexes
 enum
@@ -299,7 +335,7 @@ static const uint16_t bat_lev_uuid = ESP_GATT_UUID_BATTERY_LEVEL;
 static const uint8_t   bat_lev_ccc[2] ={ 0x00, 0x00};
 static const uint16_t char_format_uuid = ESP_GATT_UUID_CHAR_PRESENT_FORMAT;
 
-static uint8_t battary_lev = 50;
+static uint8_t battary_lev = 98;
 /// Full HRS Database Description - Used to add attributes into the database
 static const esp_gatts_attr_db_t bas_att_db[BAS_IDX_NB] =
 {

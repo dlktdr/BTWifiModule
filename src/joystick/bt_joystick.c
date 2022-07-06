@@ -21,6 +21,7 @@
 #include "driver/gpio.h"
 #include "joystick/hid_dev.h"
 
+
 /**
  * Brief:
  * This example Implemented BLE HID device profile related functions, in which the HID device
@@ -42,15 +43,15 @@
 
 #define HID_DEMO_TAG "HID_DEMO"
 
-
-static uint16_t hid_conn_id = 0;
+uint16_t btj_conn_id = 0;
 static bool sec_conn = false;
 static bool send_volum_up = false;
+volatile bool btjoystickconnected=false;
 #define CHAR_DECLARATION_SIZE   (sizeof(uint8_t))
 
 static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param);
 
-#define HIDD_DEVICE_NAME            "HID"
+#define HIDD_DEVICE_NAME            "BTWifiGamePad"
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
     //first uuid, 16bit, [12],[13] is the value
@@ -104,11 +105,13 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
 	     break;
 		case ESP_HIDD_EVENT_BLE_CONNECT: {
             ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
-            hid_conn_id = param->connect.conn_id;
+            btjoystickconnected = true;
+            btj_conn_id = param->connect.conn_id;
             break;
         }
         case ESP_HIDD_EVENT_BLE_DISCONNECT: {
             sec_conn = false;
+            btjoystickconnected = false;
             ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
             esp_ble_gap_start_advertising(&hidd_adv_params);
             break;
@@ -153,30 +156,6 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
     }
 }
 
-void hid_demo_task(void *pvParameters)
-{
-  vTaskDelay(1000 / portTICK_PERIOD_MS);
-  while(1) {
-
-      //vTaskDelay(2000 / portTICK_PERIOD_MS);
-      if (sec_conn) {
-          esp_hidd_send_joystick_value(hid_conn_id, )
-
-          //uint8_t key_vaule = {HID_KEY_A};
-          //esp_hidd_send_keyboard_value(hid_conn_id, 0, &key_vaule, 1);
-          esp_hidd_send_consumer_value(hid_conn_id, HID_CONSUMER_VOLUME_UP, true);
-          vTaskDelay(3000 / portTICK_PERIOD_MS);
-          if (send_volum_up) {
-              send_volum_up = false;
-              esp_hidd_send_consumer_value(hid_conn_id, HID_CONSUMER_VOLUME_UP, false);
-              esp_hidd_send_consumer_value(hid_conn_id, HID_CONSUMER_VOLUME_DOWN, true);
-              vTaskDelay(3000 / portTICK_PERIOD_MS);
-              esp_hidd_send_consumer_value(hid_conn_id, HID_CONSUMER_VOLUME_DOWN, false);
-          }
-      }
-  }
-}
-
 #include "bt_joystick.h"
 
 void btjoyInit()
@@ -200,6 +179,4 @@ void btjoyInit()
     and the init key means which key you can distribute to the slave. */
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
-
-    xTaskCreate(&hid_demo_task, "hid_task", 2048, NULL, 5, NULL);
 }
