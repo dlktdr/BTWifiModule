@@ -29,7 +29,7 @@ To Do (Plan is to work top down)
 - [x] Bluetooth Trainer Receiver (Master / Bluetooth)
 - [X] Bluetooth Trainer Transmitter (Slave / Bluetooth)
 - [ ] Rework serial interface for extra modes including modifications to edgetx
-- [ ] Bluetooth Joystick device
+- [x] Bluetooth Joystick device
 - [ ] A2DP Audio Source, Mirror Radio Audio
 - [ ] Bluetooth Telemetry Transmitter
 - [ ] ESPNow Trainer Master
