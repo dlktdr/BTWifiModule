@@ -104,43 +104,61 @@ uint16_t esp_hidd_get_version(void)
 #define JOYSTICK_BUTTON_LOW 1250
 
 struct PACKED {
-#ifdef JOYSTICK_BUTTONS
     uint8_t but[2];
-#endif
-    uint8_t channels[16];
+    uint16_t channels[8];
 } report;
 
 void hid_SendJoystickChannels(uint16_t chans[8])
 {
   uint16_t conn_id = btj_conn_id;
-  ESP_LOGI("JOY","Sending HID Report ch0 - %d", chans[0]);  
   memcpy(report.channels, chans, sizeof(report.channels));
 
-#ifdef JOYSTICK_BUTTONS
-    report.but[0] = 0;
-    report.but[1] = 0;
-#endif
+  report.but[0] = 0;
+  report.but[1] = 0;
 
-    for(int i=0; i < 8 ; i++) {
-        if(report.channels[i] == 0) // If disabled, center it
-            report.channels[i] = 1500;
+  for(int i=0; i < 8 ; i++) {
+    if(report.channels[i] == 0) // If disabled, center it
+      report.channels[i] = 1500;
 
-#ifdef JOYSTICK_BUTTONS
-        if(report.channels[i] >= JOYSTICK_BUTTON_HIGH) {
-                report.but[0] |= 1<<(i * 2);
-                report.but[1] |= 1<<((i - 4) * 2);
-        }
-
-        if(report.channels[i] <= JOYSTICK_BUTTON_LOW) {
-                report.but[0] |= 1<<((i * 2) + 1);
-                report.but[1] |= 1<<(((i - 4) * 2) + 1);
-        }
-#endif
-
-        report.channels[i] -= 988; // Shift from center so it's 0-1024        
+    if(report.channels[i] >= JOYSTICK_BUTTON_HIGH) {
+      report.but[0] |= 1<<(i * 2);
+      report.but[1] |= 1<<((i - 4) * 2);
     }
 
-    hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
-                        HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, sizeof(report), (uint8_t*)&report);
+    if(report.channels[i] <= JOYSTICK_BUTTON_LOW) {
+      report.but[0] |= 1<<((i * 2) + 1);
+      report.but[1] |= 1<<(((i - 4) * 2) + 1);
+    }
+
+    report.channels[i] -= 988; // Shift from center so it's 0-1024        
+  }
+
+    hid_dev_send_report(hidd_le_env.gatt_if, 
+                        conn_id,
+                        HID_RPT_ID_MOUSE_IN,
+                        HID_REPORT_TYPE_INPUT, 
+                        sizeof(report), 
+                        (uint8_t *)&report);
 }
 
+void esp_hidd_send_joystick_value(uint16_t joystick_buttons, uint8_t joystick_x, uint8_t joystick_y, uint8_t joystick_z, uint8_t joystick_rx)
+{
+  uint16_t conn_id = btj_conn_id;
+  uint8_t buffer[HID_GAMEPAD_IN_RPT_LEN];
+  ESP_LOGI(HID_LE_PRF_TAG, "the buttons value = %d js1 = %d, %d js2 = %d, %d", joystick_buttons, joystick_x, joystick_y, joystick_z, joystick_rx);
+
+  buffer[0]= joystick_buttons & 0xff;
+  buffer[1] = ( joystick_buttons >> 8);
+  buffer[2] = ( joystick_x ^ 0x80 );    // X
+  buffer[3] = (( joystick_y ^ 0x80 ) * -1) - 1;    // Y
+  buffer[4] = ( joystick_z ^ 0x80 );    // X
+  buffer[5] = (( joystick_rx ^ 0x80 ) * -1) - 1;   // Y
+
+  hid_dev_send_report(hidd_le_env.gatt_if, 
+                      conn_id,
+                      HID_RPT_ID_MOUSE_IN, 
+                      HID_REPORT_TYPE_INPUT, 
+                      6, 
+                      buffer);
+  return;
+}
