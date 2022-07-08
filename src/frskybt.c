@@ -127,7 +127,7 @@ void processTrainerFrame(const uint8_t * otxbuffer)
 
   // If the data came from the radio, send it out over bluetooth. Send same data but add the START_STOP
   if(settings.role == ROLE_BLE_PERIPHERAL) {
-    if(btjoystickconnected) {      
+    if(btjoystickconnected) {
       hid_SendJoystickChannels(channeldata);
     }
     btp_sendChannelData(_otxbuffer, otxbufferIndex+1);
