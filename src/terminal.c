@@ -396,7 +396,7 @@ void uartRXTask(void *n)
                                          UART_PIN_NO_CHANGE,
                                          UART_PIN_NO_CHANGE));
 
-  uartrxstreamhndl = xStreamBufferCreate(UART_RX_BUFFER,1);
+  uartrxstreamhndl = xStreamBufferCreate(UART_RX_BUFFER*2,1);
   if( uartrxstreamhndl == NULL )
   {
     ESP_LOGE("UARTRX","NOT ENOUGH HEAP!");

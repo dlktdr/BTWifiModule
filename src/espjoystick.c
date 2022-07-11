@@ -37,14 +37,14 @@ bool espJoystickRunning()
 void espJoystickData(const uint8_t *data, uint8_t len)
 {
   if(len == sizeof(channeldata)) {
-  const channeldata *chdata = (const channeldata *)data;
+  /*const channeldata *chdata = (const channeldata *)data;
   for(int i=0; i < 8; i++) {
     if(chdata->channelmask & 1<<i)
       printf("CH%d[%d] ", i+1, chdata->ch[i]);
   }
-  printf("\r\n");
-
-  hid_SendJoystickChannels((uint16_t *)data);
+  printf("\r\n");*/
+  if(btjoystickconnected)
+    hid_SendJoystickChannels((uint16_t *)data);
 
   } else {
     ESP_LOGE(JOYSTICK_TAG, "Unknown Data");
