@@ -32,7 +32,6 @@ StreamBufferHandle_t uartrxstreamhndl;
 
 void runBT();
 void setBaudRate(uint32_t baudRate);
-void setRole(role_t role);
 
 volatile bool uartRXTaskStarted=false;
 
@@ -114,9 +113,9 @@ void processPacket(const packet_s *packet)
       break;
     case ESP_JOYSTICK:
       if(ESP_PACKET_ISCMD(packet->type)) 
-        espAudioCommand(packet->data[0], packet->data + 1, packet->len -1);
+        espJoystickCommand(packet->data[0], packet->data + 1, packet->len -1);
       else
-        espAudioData(packet->data, packet->len);    
+        espJoystickData(packet->data, packet->len);    
       break;
     case ESP_AUDIO:
       if(ESP_PACKET_ISCMD(packet->type)) 
@@ -137,11 +136,10 @@ void mainTask(void *stuff) {
   ESP_LOGI(LOG_UART, "Waiting for settings to be read");
   while(!settings_ok) {vTaskDelay(50);}; // Pause until settings are read
   ESP_LOGI(LOG_UART, "Setting initial role");
-  if(settings.role == ROLE_UNKNOWN) {
-    ESP_LOGE(LOG_UART, "Invalid role loaded, defaulting to central");
-    settings.role = ROLE_BLE_PERIPHERAL;
+  if(settings.mode == ESP_ROOT) {
+    ESP_LOGE(LOG_UART, "No Role Loaded, Leaving off.. for now");
   }
-  setRole(settings.role);
+//  setRole(settings.role);
 
   ESP_LOGI(LOG_UART, "Waiting for UART RX Task to start");
   while(!uartRXTaskStarted);
@@ -181,7 +179,7 @@ void mainTask(void *stuff) {
   vTaskDelete(NULL);
 }
 
-void setRole(role_t role)
+/*void setRole(role_t role)
 {
   ESP_LOGI(LOG_UART,"Switching from mode %d to %d", curMode, role);
   if(role == curMode) return;
@@ -218,7 +216,7 @@ void setRole(role_t role)
 
   // Save new role to flash
   saveSettings();
-}
+}*/
 
 
 void runBTCentral()

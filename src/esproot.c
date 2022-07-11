@@ -24,6 +24,7 @@ void espRootData(const uint8_t *data, uint8_t len)
 
 void espRootCommand(uint8_t command, const uint8_t *data, uint8_t len)
 {
+  ESP_LOGI(LOG_ESPR, "Root Command %d, Extra %d", command, data[0]);    
   uint8_t mode = data[0];
   switch(command) {
 
@@ -101,7 +102,8 @@ void espRootCommand(uint8_t command, const uint8_t *data, uint8_t len)
   //    if(espIMURunning()) {
   //      espTIMUStop();
   //    }
-      break;          
+      break;         
+
     default:
       break;
     }

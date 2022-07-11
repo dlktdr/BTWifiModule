@@ -1,27 +1,55 @@
 #include <stdio.h>
 #include "espjoystick.h"
 #include "esp_log.h"
+#include "joystick/bt_joystick.h"
+#include "joystick/hidd_le_prf_int.h"
+#include "bt.h"
 
 #define JOYSTICK_TAG "JOY"
 
+bool joystickstarted=false;
+
 int espJoystickStart()
 {
-  return -1;
+  ESP_LOGI(JOYSTICK_TAG, "Joystick Starting");
+  if(joystickstarted) return -1;
+  joystickstarted = true;
+  bt_init();
+  btjoyInit();
+  return 0;
 }
 
 void espJoystickStop()
 {
-
+  ESP_LOGI(JOYSTICK_TAG, "Joystick Stop");
+  if(joystickstarted) {
+    bt_disable();
+  }
+  joystickstarted = false;
 }
 
 bool espJoystickRunning()
 {
-  return false;
+
+  return joystickstarted;
 }
 
 void espJoystickData(const uint8_t *data, uint8_t len)
 {
-  // Read audio data, resample and write to bluetooth
+  if(len == sizeof(channeldata)) {
+  const channeldata *chdata = (const channeldata *)data;
+  for(int i=0; i < 8; i++) {
+    if(chdata->channelmask & 1<<i)
+      printf("CH%d[%d] ", i+1, chdata->ch[i]);
+  }
+  printf("\r\n");
+
+  hid_SendJoystickChannels((uint16_t *)data);
+
+  } else {
+    ESP_LOGE(JOYSTICK_TAG, "Unknown Data");
+  }
+
   
 }
 

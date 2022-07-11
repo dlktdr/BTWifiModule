@@ -2,11 +2,12 @@
 
 #include "defines.h"
 #include "bt_client.h"
+#include "espdefs.h"
 
 typedef struct {
   //uint8_t version // Todo the version info here, check on load it matches otherwise ignore
   char rmtbtaddr[13];
-  role_t role;
+  uint8_t mode;
 } settings_t;
 
 extern settings_t settings;

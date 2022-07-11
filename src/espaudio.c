@@ -6,11 +6,13 @@
 
 int espAudioStart()
 {
+  ESP_LOGI(AUDIO_TAG, "Audio Starting");
   return -1;
 }
 
 void espAudioStop()
 {
+  ESP_LOGI(AUDIO_TAG, "Audio Stop");
 
 }
 

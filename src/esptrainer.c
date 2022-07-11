@@ -2,26 +2,22 @@
 #include "esptrainer.h"
 #include "esp_log.h"
 
-#define TRAINER_TAG "TRNR"
-#define MAX_OUTPUT_CHANNELS 32
-
-// Channel Format
-typedef struct  {
-  int16_t ch[MAX_OUTPUT_CHANNELS];
-  uint32_t channelmask; // Valid Channels
-} channeldata;
+#define TRAINER_TAG "TRAINER"
 
 bool trainerstarted=false;
 
 int espTrainerStart()
 {
+  ESP_LOGI(TRAINER_TAG, "Trainer Start");
   if(trainerstarted) return -1;
+  trainerstarted = true;
 
   return 0;
 }
 
 void espTrainerStop()
 {
+  ESP_LOGI(TRAINER_TAG, "Trainer Stop");
   if(!trainerstarted) return; 
   
   trainerstarted = false;

@@ -15,7 +15,7 @@
 #define BLUETOOTH_LINE_LENGTH 32
 #define BLUETOOTH_PACKET_SIZE 14
 
-uint16_t channeldata[BT_CHANNELS];
+uint16_t frchanneldata[BT_CHANNELS];
 
 /**
  * @brief Displays the decoded channel values and time since last receive
@@ -34,14 +34,14 @@ void logBTFrame(bool valid, char message[])
   } else {
     ESP_LOGI(FRSKYBT_TAG, "(%05lld)Ch1[%04d] Ch2[%04d] Ch3[%04d] Ch4[%04d] Ch5[%04d] Ch6[%04d] Ch7[%04d] Ch8[%04d]",
                      timestamp,
-                     channeldata[0],
-                     channeldata[1],
-                     channeldata[2],
-                     channeldata[3],
-                     channeldata[4],
-                     channeldata[5],
-                     channeldata[6],
-                     channeldata[7]);
+                     frchanneldata[0],
+                     frchanneldata[1],
+                     frchanneldata[2],
+                     frchanneldata[3],
+                     frchanneldata[4],
+                     frchanneldata[5],
+                     frchanneldata[6],
+                     frchanneldata[7]);
   }
 }
 
@@ -121,17 +121,17 @@ void processTrainerFrame(const uint8_t * otxbuffer)
 {
   for (uint8_t channel=0, i=1; channel<BT_CHANNELS; channel+=2, i+=3) {
     // +-500 != 512, but close enough.
-    channeldata[channel] = otxbuffer[i] + ((otxbuffer[i+1] & 0xf0) << 4);
-    channeldata[channel+1] = ((otxbuffer[i+1] & 0x0f) << 4) + ((otxbuffer[i+2] & 0xf0) >> 4) + ((otxbuffer[i+2] & 0x0f) << 8);
+    frchanneldata[channel] = otxbuffer[i] + ((otxbuffer[i+1] & 0xf0) << 4);
+    frchanneldata[channel+1] = ((otxbuffer[i+1] & 0x0f) << 4) + ((otxbuffer[i+2] & 0xf0) >> 4) + ((otxbuffer[i+2] & 0x0f) << 8);
   }
 
   // If the data came from the radio, send it out over bluetooth. Send same data but add the START_STOP
-  if(settings.role == ROLE_BLE_PERIPHERAL) {
+/*  if(settings.mode == ROLE_BLE_PERIPHERAL) {
     if(btjoystickconnected) {
-      hid_SendJoystickChannels(channeldata);
+      hid_SendJoystickChannels(frchanneldata);
     }
-    btp_sendChannelData(_otxbuffer, otxbufferIndex+1);
-  }
+    btp_sendfrchanneldata(_otxbuffer, otxbufferIndex+1);
+  }*/
 }
 
 void frSkyProcessByte(uint8_t data)

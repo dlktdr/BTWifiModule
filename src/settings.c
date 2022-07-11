@@ -2,6 +2,7 @@
 #include "nvs_flash.h"
 #include "settings.h"
 
+
 #define LOG_SET "SETTINGS"
 
 #define NVS_STRUCT_KEY "skey"
@@ -9,7 +10,7 @@
 void _loadSettings(settings_t *set);
 
 settings_t settings = {
-  .role = ROLE_UNKNOWN  
+  .mode = ESP_ROOT,
 };
 extern nvs_handle_t nvs_flsh_btw;
 volatile bool settings_ok = false;
@@ -24,7 +25,7 @@ void saveSettings()
     ESP_LOGI(LOG_SET, "No data differs, not writing to flash");
     return;
   } else {
-    ESP_LOGI(LOG_SET, "Data is different, FR=%d, MR=%d", flashsettings.role, settings.role);
+    ESP_LOGI(LOG_SET, "Data is different, FR=%d, MR=%d", flashsettings.mode, settings.mode);
   }
 
   esp_err_t err = nvs_set_blob(nvs_flsh_btw, NVS_STRUCT_KEY, (void *)&settings, sizeof(settings_t));
