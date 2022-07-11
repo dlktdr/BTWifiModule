@@ -17,17 +17,23 @@
 
 #include "esproot.h"
 #include "esptrainer.h"
+#include "espaudio.h"
+#include "freertos/stream_buffer.h"
 
 #define LOG_UART "UART"
 
-#define UART_RX_BUFFER 512
+#define UART_RX_BUFFER 1024
 #define REUSABLE_BUFFER 250
 #define AT_CMD_MAX_LEN 40
 #define BT_CMD_MAX_LEN 30
 
+StreamBufferHandle_t uartrxstreamhndl;
+
 void runBT();
 void setBaudRate(uint32_t baudRate);
 void setRole(role_t role);
+
+volatile bool uartRXTaskStarted=false;
 
 const uart_port_t uart_num = UART_NUM;
 
@@ -81,17 +87,6 @@ int atcommandlen=-1;
 
 circular_buffer uartinbuf;
 
-enum ESPModes {
-  ESP_ROOT,
-  ESP_TELEMETRY,
-  ESP_TRAINER,
-  ESP_JOYSTICK,
-  ESP_AUDIO,
-  ESP_FTP,
-  ESP_IMU,
-  ESP_MAX
-};
-
 #define ESP_BASE 0
 #define ESP_PACKET_TYPE_MSK 0x0F
 #define ESP_PACKET_CMD_BIT 6
@@ -116,10 +111,17 @@ void processPacket(const packet_s *packet)
       else
         espTrainerData(packet->data, packet->len);
       break;
-      break;
     case ESP_JOYSTICK:
+      if(ESP_PACKET_ISCMD(packet->type)) 
+        espAudioCommand(packet->data[0], packet->data + 1, packet->len -1);
+      else
+        espAudioData(packet->data, packet->len);    
       break;
     case ESP_AUDIO:
+      if(ESP_PACKET_ISCMD(packet->type)) 
+        espAudioCommand(packet->data[0], packet->data + 1, packet->len -1);
+      else
+        espAudioData(packet->data, packet->len);
       break;
     case ESP_FTP:
       break;
@@ -130,18 +132,7 @@ void processPacket(const packet_s *packet)
 
 #define PACKED_BUFFERS 5
 
-void runUARTHead(void *stuff) {
-  // Setup UART Port
-  ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
-  ESP_ERROR_CHECK(uart_driver_install(uart_num, UART_RX_BUFFER * 4,
-                                      UART_RX_BUFFER * 4, 0, NULL, 0));
-  ESP_ERROR_CHECK(uart_set_pin(uart_num, UART_TXPIN,
-                                         UART_RXPIN,
-                                         UART_PIN_NO_CHANGE,
-                                         UART_PIN_NO_CHANGE));
-
-  cb_init(&uartinbuf, UART_RX_BUFFER*2);
-
+void mainTask(void *stuff) {
   ESP_LOGI(LOG_UART, "Waiting for settings to be read");
   while(!settings_ok) {vTaskDelay(50);}; // Pause until settings are read
   ESP_LOGI(LOG_UART, "Setting initial role");
@@ -151,59 +142,41 @@ void runUARTHead(void *stuff) {
   }
   setRole(settings.role);
 
-  char* data = (char*) malloc(UART_RX_BUFFER+1);
-  if(data == NULL) {
-    ESP_LOGE(LOG_UART, "No Memory!!!!!\nHALT");
-    for(;;) {}
-  }
+  ESP_LOGI(LOG_UART, "Waiting for UART RX Task to start");
+  while(!uartRXTaskStarted);
 
   packet_s packet;
-  while (1) {
-    uint8_t encodedbuffer[UART_RX_BUFFER];
-    int cnt = uart_read_bytes(uart_num, data, UART_RX_BUFFER, 0);
+  uint8_t buffer[sizeof(packet_s)+1];
+  int bufferpos =0;
 
-    for (int i = 0; i < cnt; i++) {
-      if(!cb_push_back(&uartinbuf, data + i)) {
-        ESP_LOGE("UartRX", "Circular buffer full");
-      }
-      if(data[i] == 0) {
-        char c;
-        char *ptr = (char*)encodedbuffer;
-        int len=0;
-        while (!cb_pop_front(&uartinbuf, &c)) {
-          *ptr++ = c;
-          len++;
-          if(len == sizeof(encodedbuffer)) {
-            ESP_LOGE("UartRX", "Buffer overflow");
-            break;
-          }
-        }
-        cb_clear(&uartinbuf); // Clear the buffer
-
-//        ESP_LOG_BUFFER_HEX("EBL", encodedbuffer, len);
-        int lenout = cobs_decode(encodedbuffer,len,(uint8_t *)&packet);
-//        ESP_LOG_BUFFER_HEX("P", (uint8_t *)&packet, lenout);
+  while (1) {    
+    char inb;
+    int rec = xStreamBufferReceive(uartrxstreamhndl, &inb, 1, 10);
+    if(rec) {
+      if(inb == 0 && bufferpos != 0) {               
+        int lenout = cobs_decode(buffer,bufferpos,(uint8_t *)&packet);
+        //ESP_LOG_BUFFER_HEX("P", (uint8_t *)&packet, lenout);
         uint16_t packetcrc = packet.crcl | (packet.crch << 8); // Store transmitted packet
         packet.crcl = 0xBB;
         packet.crch = 0xAA;
-        uint16_t calccrc = crc16(0,(uint8_t *)&packet,lenout - 1, 0);
-        packet.len = lenout - PACKET_OVERHEAD - 1;
-//        printf("in %d out %d data %d\r\n", len, lenout, packet.len);
+        uint16_t calccrc = crc16(0,(uint8_t *)&packet,lenout, 0);
+        packet.len = lenout - PACKET_OVERHEAD;
+  //        printf("in %d out %d data %d\r\n", len, lenout, packet.len);
         if(packetcrc == calccrc) {
-          // Successful packet, parse it
-          processPacket(&packet);
+          processPacket(&packet); 
         } else {
           ESP_LOGE("PM", "CRC Fault");
         }
-
+        bufferpos = 0;
+      } else {
+        buffer[bufferpos++] = inb;
+        if(bufferpos == sizeof(buffer)) {
+          printf("Buffer Overflow\r\n");
+          bufferpos = 0;
+        }
       }
     }
-    //uart_write_bytes(uart_num,"Hello\n",7);
-
-//    runBT();
-    vTaskDelay(1);
   }
-  free(data);
   vTaskDelete(NULL);
 }
 
@@ -236,6 +209,11 @@ void setRole(role_t role)
       bt_init();
       btpInit();
       break;
+    case ROLE_BLE_JOYSTICK:
+      btPeripherialState = PERIPHERIAL_STATE_DISCONNECTED;
+      bt_init();
+      //btjInit(); // TOOD
+
     default:
       break;
   }
@@ -365,11 +343,12 @@ void runBT()
   }
 }
 
-void write(const uint8_t *dat, int len, bool iscmd, int id)
+// Builds a packet
+void writePacket(const uint8_t *dat, int len, bool iscmd, int mode)
 {
   uint8_t encodedbuffer[sizeof(packet_s) + 1];
   packet_s packet;
-  packet.type = id;
+  packet.type = mode;
   packet.type |= (iscmd << ESP_PACKET_CMD_BIT);
   packet.crcl = 0xBB;
   packet.crch = 0xAA;
@@ -383,4 +362,63 @@ void write(const uint8_t *dat, int len, bool iscmd, int id)
 
   // Write the packet
   uart_write_bytes(uart_num, (uint8_t *)&packet, wl+1);
+}
+
+// Sends some data
+void writeData(int mode, const uint8_t *dat, int len)
+{
+  writePacket(dat, len, false, mode);
+}
+
+// Send a command
+void writeCommand(int mode, uint8_t command, const uint8_t *dat, int len)
+{
+  uint8_t *data = malloc(len+1);
+  memcpy(data + 1, dat, len);
+  data[0] = command;
+  writePacket(data, len+1, true, mode);
+  free(data);
+}
+
+// Writes an acknowledge/ not-acknowledge and a optional message
+void writeAckNak(int mode, bool ack, const char *message)
+{
+  uint8_t command = ESP_ROOTCMD_ACKNAK | (ack?1<<ESP_PACKET_ACK_BIT:0);
+  writeCommand(ESP_ROOT, command, message, strlen(message));
+}
+
+// Read from the UART RX, write to the stream if data available, this task should be high Priority
+
+void uartRXTask(void *n)
+{
+  // Setup UART Port
+  ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
+  ESP_ERROR_CHECK(uart_driver_install(uart_num, UART_RX_BUFFER * 4,
+                                      UART_RX_BUFFER * 4, 0, NULL, 0));
+  ESP_ERROR_CHECK(uart_set_pin(uart_num, UART_TXPIN,
+                                         UART_RXPIN,
+                                         UART_PIN_NO_CHANGE,
+                                         UART_PIN_NO_CHANGE));
+
+  uartrxstreamhndl = xStreamBufferCreate(UART_RX_BUFFER,1);
+  if( uartrxstreamhndl == NULL )
+  {
+    ESP_LOGE("UARTRX","NOT ENOUGH HEAP!");
+  }
+  // TODO - MAKE ME DMA
+  char *data = (char*)malloc(UART_RX_BUFFER);
+  uartRXTaskStarted = true;
+  while(1) {  
+    int cnt = uart_read_bytes(uart_num, data, UART_RX_BUFFER, 1);
+    if(cnt) {
+      int len= xStreamBufferSend(uartrxstreamhndl, data, cnt, 0);
+      if(cnt != len) {
+        printf("Unable to fill the stream, %d written - Dropping all data\r\n", len);
+        while(xStreamBufferReset(uartrxstreamhndl) == pdFAIL) {
+          vTaskDelay(1);
+        }
+      }
+    }
+  }
+  free(data);
 }

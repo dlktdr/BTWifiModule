@@ -1,12 +1,9 @@
 #pragma once
 
-#include <stdint.h>
+#include "espdefs.h"
 
-enum ESPTrainerCmds {
-  ESP_TRAINERCMD_SET_MASTER,
-  ESP_TRAINERCMD_SET_SLAVE,
-  ESP_TRAINERCMD_COUNT,
-};
-
+int espTrainerStart();
+void espTrainerStop();
+bool espTrainerRunning();
 void espTrainerData(const uint8_t *data, uint8_t len);
 void espTrainerCommand(uint8_t command, const uint8_t *data, uint8_t len);

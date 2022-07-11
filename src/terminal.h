@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "espdefs.h"
 
 // Packet Format
 typedef struct PACKED {
@@ -23,14 +24,15 @@ typedef struct PACKED {
  *   data[1:255] = UserData
  * If command bit(6) = 0
  *   data[0:255] = DataStream
+
  */
 
-#define ESP_PACKET_CMD_BIT 6
-#define ESP_PACKET_ACK_BIT 7
-#define ESP_PACKET_ISCMD(t) (t&(1<<ESP_PACKET_CMD_BIT))
-#define ESP_PACKET_ISACKREQ(t) (t&(1<<ESP_PACKET_ACK_BIT))
 
 typedef uint8_t espmode;
 
-void runUARTHead(void *n);
+void mainTask(void *n);
+void uartRXTask(void *n);
 void logBTFrame(const char btdata[], int len);
+void writeAckNak(int mode, bool ack, const char *message);
+void writeData(int mode, const uint8_t *dat, int len);
+void writeCommand(int mode, uint8_t command, const uint8_t *dat, int len);
