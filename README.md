@@ -1,7 +1,7 @@
 # BTWifiModule
 Frsky Bluetooth Emulator
 
-This code is for use on a ESP Wroom 32, it emulates a FRSky Bluetooth module but with way more future possibilities.
+This code is for use on a ESP Wroom 32/Pico/C3, it emulates a FRSky Bluetooth module but with way more future possibilities.
 
 # Supported Boards
 
