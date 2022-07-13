@@ -5,6 +5,7 @@
 #include "espaudio.h"
 #include "terminal.h"
 #include "espdefs.h"
+#include "espconmngr.h"
 
 #define LOG_ESPR "ESPROOT"
 
@@ -43,9 +44,9 @@ void espRootCommand(uint8_t command, const uint8_t *data, uint8_t len)
                          data[0] == ESP_AUDIO || 
                          data[0] == ESP_FTP))) { 
       ESP_LOGE(LOG_ESPR, "Cannot start Radio already used");
-      writeAckNak(mode,false, "Radio already used"); 
+      writeAckNak(data[0],false, "Radio already used"); 
     } else {
-      switch (mode)
+      switch (data[0])
       {
       case ESP_TELEMETRY:
         //STARTRADIO_MODE(ESP_TELEMETRY, espTelemetryStart());
