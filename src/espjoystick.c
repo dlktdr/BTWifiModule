@@ -45,7 +45,6 @@ void espJoystickData(const uint8_t *data, uint8_t len)
   printf("\r\n");*/
   if(btjoystickconnected)
     hid_SendJoystickChannels((uint16_t *)data);
-
   } else {
     ESP_LOGE(JOYSTICK_TAG, "Unknown Data");
   }

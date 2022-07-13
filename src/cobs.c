@@ -3,7 +3,7 @@
 int cobs_encode(const uint8_t* buffer, int size, uint8_t* encodedBuffer)
 {
   int read_index  = 0;
-  int write_index = 0;
+  int write_index = 1;
   int code_index  = 0;
   uint8_t code    = 1;
 

@@ -26,25 +26,40 @@ enum ESPRootCmds {
   ESP_ROOTCMD_START_MODE,
   ESP_ROOTCMD_STOP_MODE,
   ESP_ROOTCMD_RESTART,
-  ESP_ROOTCMD_GET_VER,
-  ESP_ROOTCMD_EVENT,
+  ESP_ROOTCMD_VERSION,
+  ESP_ROOTCMD_CON_EVENT,
+  ESP_ROOTCMD_CON_MGMNT,
 };
 
-
-enum ESPEvents {
-  ESP_EVT_DISCOVER_STARTED,
+enum ESPConnectionEvents {
+  ESP_EVT_DISCOVER_STARTED,  
   ESP_EVT_DISCOVER_COMPLETE,
   ESP_EVT_DEVICE_FOUND,
   ESP_EVT_CONNECTED,
-  ESP_EVT_DISCONNECTED,
+  ESP_EVT_DISCONNECTED,  
   ESP_EVT_PIN_REQUEST,
   ESP_EVT_IP_OBTAINED
+};
+
+enum ESPConnectionManagment {
+  ESP_CON_DISCOVER_START,
+  ESP_CON_DISCOVER_STOP,
+  ESP_CON_CONNECT,
+  ESP_CON_DISCONNECT,
+  ESP_CON_SET_NAME,
+  ESP_CON_SET_MAC,
+  ESP_CON_SET_SSID,
+  ESP_CON_SET_IP,
+  ESP_CON_SET_SUBNET_MASK,
+  ESP_CON_SET_STATIC_IP,
+  ESP_CON_SET_DHCP,
+  ESP_CON_SET_WIFI_STATION,
+  ESP_CON_SET_WIFI_AP,
 };
 
 enum ESPTrainerCmds {
   ESP_TRAINERCMD_SET_MASTER,
   ESP_TRAINERCMD_SET_SLAVE,
-  ESP_TRAINERCMD_COUNT,
 };
 
 // Channel Data (Joystick, Trainer)
@@ -56,3 +71,18 @@ typedef struct  {
   int16_t ch[MAX_OUTPUT_CHANNELS];
   uint32_t channelmask; // Valid Channels
 } channeldata;
+
+typedef struct {
+  uint8_t bteaddr[6];
+  uint8_t rssi;
+  char name[30];
+} btscanresult;
+
+typedef struct  {
+  uint8_t maj;
+  uint8_t min;
+  uint8_t rev;
+  uint8_t sha[10]; 
+} espversion;
+
+extern espversion espVersion;

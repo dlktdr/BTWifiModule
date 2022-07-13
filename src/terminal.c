@@ -19,6 +19,7 @@
 #include "esproot.h"
 #include "esptrainer.h"
 #include "espaudio.h"
+#include "espjoystick.h"
 #include "freertos/stream_buffer.h"
 
 #define LOG_UART "UART"
@@ -29,9 +30,6 @@
 #define BT_CMD_MAX_LEN 30
 
 StreamBufferHandle_t uartrxstreamhndl;
-
-void runBT();
-void setBaudRate(uint32_t baudRate);
 
 volatile bool uartRXTaskStarted=false;
 
@@ -134,7 +132,7 @@ void processPacket(const packet_s *packet)
 
 void mainTask(void *stuff) {
   ESP_LOGI(LOG_UART, "Waiting for settings to be read");
-  while(!settings_ok) {vTaskDelay(50);}; // Pause until settings are read
+  while(!settings_ok) {vTaskDelay(50);};
   ESP_LOGI(LOG_UART, "Setting initial role");
   if(settings.mode == ESP_ROOT) {
     ESP_LOGE(LOG_UART, "No Role Loaded, Leaving off.. for now");
@@ -142,14 +140,14 @@ void mainTask(void *stuff) {
 //  setRole(settings.role);
 
   ESP_LOGI(LOG_UART, "Waiting for UART RX Task to start");
-  while(!uartRXTaskStarted);
+  while(!uartRXTaskStarted) {vTaskDelay(20);}
 
   packet_s packet;
   uint8_t buffer[sizeof(packet_s)+1];
   int bufferpos =0;
 
   while (1) {    
-    char inb;
+    uint8_t inb;
     int rec = xStreamBufferReceive(uartrxstreamhndl, &inb, 1, 10);
     if(rec) {
       if(inb == 0 && bufferpos != 0) {               
@@ -160,7 +158,6 @@ void mainTask(void *stuff) {
         packet.crch = 0xAA;
         uint16_t calccrc = crc16(0,(uint8_t *)&packet,lenout, 0);
         packet.len = lenout - PACKET_OVERHEAD;
-  //        printf("in %d out %d data %d\r\n", len, lenout, packet.len);
         if(packetcrc == calccrc) {
           processPacket(&packet); 
         } else {
@@ -175,6 +172,14 @@ void mainTask(void *stuff) {
         }
       }
     }
+
+    // TEST SENDING PACKETS
+/*    static uint count=0;
+    if(count++ % 20 == 0) {
+      printf("Writting: Hello, Mode=2\r\n");
+      writePacket("Hello",5,false,2);
+      writeCommand(1,3,"DATA",4);
+    }*/
   }
   vTaskDelete(NULL);
 }
@@ -219,7 +224,7 @@ void mainTask(void *stuff) {
 }*/
 
 
-void runBTCentral()
+/*void runBTCentral()
 {
   switch(btCentralState) {
     case CENTRAL_STATE_DISCONNECT: {
@@ -317,74 +322,51 @@ void runBTPeripherial()
       }
       break;
   }
-}
-
-void runBT()
-{
-  switch(curMode) {
-    case ROLE_BLE_CENTRAL:
-      runBTCentral();
-      break;
-    case ROLE_BLE_PERIPHERAL:
-      runBTPeripherial();
-      break;
-    /*case ROLE_BTEDR_AUDIO_SOURCE:
-      break;
-    case ROLE_ESPNOW_CENTRAL:
-      break;
-    case ROLE_ESPNOW_PERIPHERAL:
-      break;*/
-    default:
-      break;
-  }
-}
+}*/
 
 // Builds a packet
-void writePacket(const uint8_t *dat, int len, bool iscmd, int mode)
+void writePacket(const uint8_t *dat, int len, bool iscmd, uint8_t mode)
 {
   uint8_t encodedbuffer[sizeof(packet_s) + 1];
   packet_s packet;
   packet.type = mode;
-  packet.type |= (iscmd << ESP_PACKET_CMD_BIT);
+  if(iscmd)
+    packet.type |= (1 << ESP_PACKET_CMD_BIT);
   packet.crcl = 0xBB;
   packet.crch = 0xAA;
   memcpy(packet.data, dat, len); // TODO, Remove me, extra copy for just the crc calc.
   uint16_t crc = crc16(0, (uint8_t *)&packet,len + PACKET_OVERHEAD, 0);
   packet.crcl = crc & 0xFF;
   packet.crch = (crc & 0xFF00) >> 8;
-  int wl = cobs_encode((uint8_t *)&packet, packet.len + PACKET_OVERHEAD, encodedbuffer);
-
-  encodedbuffer[wl] = '\0'; // Null terminate packet, used for detection of packet end
-
-  // Write the packet
-  uart_write_bytes(uart_num, (uint8_t *)&packet, wl+1);
+  
+  int wl = cobs_encode((uint8_t *)&packet, len + PACKET_OVERHEAD, encodedbuffer);
+  encodedbuffer[wl] = '\0';
+  uart_write_bytes(uart_num, (void *)&encodedbuffer, wl+1);
 }
 
 // Sends some data
-void writeData(int mode, const uint8_t *dat, int len)
+void writeData(uint8_t mode, const uint8_t *dat, int len)
 {
   writePacket(dat, len, false, mode);
 }
 
 // Send a command
-void writeCommand(int mode, uint8_t command, const uint8_t *dat, int len)
+void writeCommand(uint8_t mode, uint8_t command, const uint8_t *dat, int len)
 {
-  uint8_t *data = malloc(len+1);
-  memcpy(data + 1, dat, len);
-  data[0] = command;
-  writePacket(data, len+1, true, mode);
-  free(data);
+  uint8_t buffer[256];
+  buffer[0] = command; // First byte of a command is the command, data follows
+  memcpy(buffer+1, dat, len);
+  writePacket(buffer, len+1, true, mode);
 }
 
-// Writes an acknowledge/ not-acknowledge and a optional message
-void writeAckNak(int mode, bool ack, const char *message)
+// Writes an acknowledge / not-acknowledge and a optional message
+void writeAckNak(uint8_t mode, bool ack, const char *message)
 {
   uint8_t command = ESP_ROOTCMD_ACKNAK | (ack?1<<ESP_PACKET_ACK_BIT:0);
-  writeCommand(ESP_ROOT, command, message, strlen(message));
+  writeCommand(ESP_ROOT, command, (const char *)message, strlen(message));
 }
 
 // Read from the UART RX, write to the stream if data available, this task should be high Priority
-
 void uartRXTask(void *n)
 {
   // Setup UART Port

@@ -23,7 +23,7 @@ bool espAudioRunning()
 
 void espAudioData(const uint8_t *data, uint8_t len)
 {
- // Read audio data, resample and write to bluetooth
+  // Read audio data, resample and write to bluetooth
 
 }
 
