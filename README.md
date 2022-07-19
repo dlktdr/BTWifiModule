@@ -3,6 +3,10 @@ Frsky Bluetooth Emulator
 
 This code is for use on a ESP Wroom 32, it emulates a FRSky Bluetooth module but with way more future possibilities.
 
+## Documentation for this project is moving to Git Book
+### https://btwifimod.gitbook.io/
+
+
 # Supported Boards
 
 So far this has been tested on the PICO / WROOM32 and C3mini Boards. I would recommended to buy the listed boards in the external antenna versions if you plan on mounting inside a case, buy a adapter to RP-SMA mount this on your case and you can use a generic wifi antenna on the outside. These boards can be bought very cheaply, around $7 - $15 depending on the versions. The code isn't very large you can buy the cheapest 4Mb versions.
