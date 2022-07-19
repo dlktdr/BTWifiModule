@@ -17,7 +17,8 @@
 * This is a community project, feel free to make changes, discussion and create pull requests. There are lots of features to be worked on I would appriciate the help.
 * Visit the discord chat to chat in realtime on tasks.
 * If you find a bug and you can fix it yourself. Awesome! make a Pull Request.
-* This project is built with PlatformIO, an excellent way to get program microcontrollers. Please visit the documentation on how to get the build environment setup.
+* This project is built with PlatformIO, an excellent way to get into programming microcontrollers. Please visit the documentation on how to get the build environment setup. 
+* Beginners to advanced users are welcome, don't be affraid to ask questions.
 
 #### Documentation
 
