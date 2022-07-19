@@ -36,4 +36,4 @@ void logBTFrame(const char btdata[], int len);
 void writePacket(const uint8_t *dat, int len, bool iscmd, uint8_t mode);
 void writeData(uint8_t mode, const uint8_t *dat, int len);
 void writeCommand(uint8_t mode, uint8_t command, const uint8_t *dat, int len);
-void writeAckNak(uint8_t mode, bool ack, const char *message);
+void writeAck();
