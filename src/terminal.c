@@ -22,6 +22,35 @@
 #include "esptrainer.h"
 #include "freertos/stream_buffer.h"
 
+#define DEBUG_PACKETS
+
+#ifdef DEBUG_PACKETS
+const char *ESPRootCmdsStr[] = {"Start Mode", "Stop Mode", "Active Modes",
+                                "Restart",    "Version",   "ConEvent",
+                                "ConMgmt",    "SetValue",  "GetValue"};
+
+const char *ESPModesStr[] = {"Root",  "Telemetry", "Trainer", "Joystick",
+                             "Audio", "FTP",       "IMU"};
+
+#define DEBUG_PACKET(pkt)                                                   \
+  if (!ESP_PACKET_ISCMD(pkt->type))                                         \
+    printf("RX[D] Mode-%s Len-%d\r\n",                                         \
+           ESPModesStr[pkt->type & ESP_PACKET_TYPE_MSK], pkt->len);      \
+  else if (ESP_PACKET_ISACK(pkt->type))                                     \
+    printf("TX[C] Mode-%s (Acknowledge)\r\n",                                  \
+           ESPModesStr[pkt->type & ESP_PACKET_TYPE_MSK]);                   \
+  else if (pkt->type == ESP_ROOT)                                           \
+    printf("TX[C] Mode-%s Cmd-%s Len-%d\r\n",                                  \
+           ESPModesStr[pkt->type & ESP_PACKET_TYPE_MSK],                    \
+           ESPRootCmdsStr[pkt->data[0]], pkt->len - 1);                  \
+  else                                                                         \
+    printf("RX[C] Mode-%s Cmd-0x%0.2x Len-%d\r\n",                             \
+           ESPModesStr[pkt->type & ESP_PACKET_TYPE_MSK], pkt->data[0],   \
+           pkt->len - 1);
+#else
+#define DEBUG_PACKET(packet)
+#endif
+
 #define LOG_UART "UART"
 
 #define UART_RX_BUFFER 1024
@@ -80,17 +109,15 @@ int atcommandlen = -1;
 
 circular_buffer uartinbuf;
 
-#define ESP_BASE 0
-#define ESP_PACKET_TYPE_MSK 0x0F
-#define ESP_PACKET_CMD_BIT 6
-#define ESP_PACKET_ACK_BIT 7
-#define ESP_PACKET_ISCMD(t) (t & (1 << ESP_PACKET_CMD_BIT))
-#define ESP_PACKET_ISACKREQ(t) (t & (1 << ESP_PACKET_ACK_BIT))
-
 void processPacket(const packet_s *packet) {
-  // Acknowledge we got the command, so radio knows we are running
-  if(ESP_PACKET_ISCMD(packet->type)) {
+  DEBUG_PACKET(packet);
+
+  // Acknowledge we got the command
+  if (ESP_PACKET_ISCMD(packet->type) && !ESP_PACKET_ISACK(packet->type)) {
     writeAck();
+  } else if (ESP_PACKET_ISCMD(packet->type) && ESP_PACKET_ISACK(packet->type)) {
+    ESP_LOGD("PCKT", "ACK Rec");
+    // TODO use it.
   }
 
   switch (packet->type & ESP_PACKET_TYPE_MSK) {
@@ -349,6 +376,8 @@ void writePacket(const uint8_t *dat, int len, bool iscmd, uint8_t mode) {
       cobs_encode((uint8_t *)&packet, len + PACKET_OVERHEAD, encodedbuffer);
   encodedbuffer[wl] = '\0';
   uart_write_bytes(uart_num, (void *)&encodedbuffer, wl + 1);
+
+  DEBUG_PACKET((&packet));
 }
 
 // Sends some data
@@ -366,7 +395,7 @@ void writeCommand(uint8_t mode, uint8_t command, const uint8_t *dat, int len) {
 
 // Writes an acknowledge / not-acknowledge and a optional message
 void writeAck() {
-  writeCommand(ESP_ROOT, 1 << ESP_PACKET_ACK_BIT, NULL, 0);
+  writePacket(NULL, 0, true, ESP_ROOT | 1 << ESP_PACKET_ACK_BIT);
 }
 
 // Read from the UART RX, write to the stream if data available, this task

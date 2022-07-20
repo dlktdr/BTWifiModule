@@ -36,12 +36,12 @@ enum ESPRootCmds {
 };
 
 enum ESPConnectionEvents {
-  ESP_EVT_MESSAGE,           // String value of status
+  ESP_EVT_MESSAGE, // String value of status
   ESP_EVT_DISCOVER_STARTED,
   ESP_EVT_DISCOVER_COMPLETE,
-  ESP_EVT_DEVICE_FOUND,      // A connectable device was found
-  ESP_EVT_CONNECTED,         // Periodically send this event.
-  ESP_EVT_DISCONNECTED,      // Periodically send this event.
+  ESP_EVT_DEVICE_FOUND, // A connectable device was found
+  ESP_EVT_CONNECTED,    // Periodically send this event.
+  ESP_EVT_DISCONNECTED, // Periodically send this event.
   ESP_EVT_PIN_REQUEST,
   ESP_EVT_IP_OBTAINED
 };
@@ -63,11 +63,10 @@ enum ESPTrainerCmds {
   ESP_TRAINERCMD_SET_SLAVE,
 };
 
-
 // Channel Format
 typedef struct {
   int16_t ch[MAX_OUTPUT_CHANNELS];
-  uint32_t channelmask;  // Valid Channels
+  uint32_t channelmask; // Valid Channels
 } channeldata;
 
 typedef struct {
@@ -83,9 +82,8 @@ typedef struct {
   uint8_t sha[10];
 } espversion;
 
-
 typedef struct {
-  uint8_t event;  // Event ID
+  uint8_t event; // Event ID
   uint8_t data[50];
 } espevent;
 
@@ -109,9 +107,11 @@ typedef struct {
   uint8_t wifiStationMode;
 } espsettings;
 
-#define SETTING_LINK_ARR(name, _array) {name, (void*)_array, sizeof(_array)}
-#define SETTING_LINK_VAR(name, variable) {name, &variable, sizeof(variable)}
-#define SETTINGS_COUNT (sizeof(espSettingsIndex)/sizeof(espsettingslink))
+#define SETTING_LINK_ARR(name, _array)                                         \
+  { name, (void *)_array, sizeof(_array) }
+#define SETTING_LINK_VAR(name, variable)                                       \
+  { name, &variable, sizeof(variable) }
+#define SETTINGS_COUNT (sizeof(espSettingsIndex) / sizeof(espsettingslink))
 #define SETTING_LEN 4
 
 extern espsettings espSettings;

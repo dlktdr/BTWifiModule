@@ -15,9 +15,10 @@ espversion espVersion = {1, 0, 0, "GITTAG"};
 
 // Global ESP Settings
 espsettings espSettings;
+
+// Settings must be 4 characters!
 const espsettingslink espSettingsIndex[] = {
-    SETTING_LINK_ARR("name",
-                     espSettings.name), // Settings must be 4 characters!
+    SETTING_LINK_ARR("name", espSettings.name),
     SETTING_LINK_ARR("wmac", espSettings.wifimac),
     SETTING_LINK_ARR("btma", espSettings.blemac),
     SETTING_LINK_ARR("ssid", espSettings.ssid),
@@ -71,7 +72,7 @@ uint8_t runningModes;
 void espRootData(const uint8_t *data, uint8_t len) {}
 
 void espRootCommand(uint8_t command, const uint8_t *data, uint8_t len) {
-  ESP_LOGI(LOG_ESPR, "Root Command %d", command);
+  //ESP_LOGI(LOG_ESPR, "Root Command %d", command);
 
   switch (command) {
   case ESP_ROOTCMD_START_MODE:
@@ -178,17 +179,17 @@ void espRootCommand(uint8_t command, const uint8_t *data, uint8_t len) {
     break;
   case ESP_ROOTCMD_SET_VALUE: {
     // First 4 Characters are the Variable, Remainder is the Data
-    if (len > 5) {
+    if (len > 4) {
       char variable[5];
       memcpy(variable, data, 4);
       variable[4] = '\0';
-      ESP_LOGI("SETT", "Radio Set %s", variable);
+      // ESP_LOGI("SETT", "Radio Set %s", variable);
       for (unsigned int i = 0; i < SETTINGS_COUNT; i++) {
         if (!strcmp(variable, espSettingsIndex[i].variable)) {
           // Found the variable, make sure it's the same size
           if (len - SETTING_LEN == espSettingsIndex[i].len) {
             memcpy(espSettingsIndex[i].ptr, data + 4, len - 4);
-            ESP_LOGI("SETT", "Radio Set Success");
+            ESP_LOGI("ROOT", "Radio Set %s Success", espSettingsIndex[i].variable);
           }
           break;
         }
@@ -203,13 +204,14 @@ void espRootCommand(uint8_t command, const uint8_t *data, uint8_t len) {
       char variable[5];
       memcpy(variable, data, 4);
       variable[4] = '\0';
-      ESP_LOGI("SETT", "Radio Requesting %s", variable);
+      // ESP_LOGI("SETT", "Radio Requesting %s", variable);
       for (unsigned int i = 0; i < SETTINGS_COUNT; i++) {
         if (!strcmp(variable, espSettingsIndex[i].variable)) {
-          ESP_LOGI("SETT", "Found Variable.. Sending");
+          ESP_LOGI("ROOT", "Found Variable %s.. Sending it", espSettingsIndex[i].variable);
           memcpy(buffer, espSettingsIndex[i].variable, SETTING_LEN);
-          memcpy(buffer+4, espSettingsIndex[i].ptr, espSettingsIndex[i].len);
-          writeCommand(ESP_ROOT, ESP_ROOTCMD_SET_VALUE, buffer, espSettingsIndex[i].len+SETTING_LEN);
+          memcpy(buffer + 4, espSettingsIndex[i].ptr, espSettingsIndex[i].len);
+          writeCommand(ESP_ROOT, ESP_ROOTCMD_SET_VALUE, buffer,
+                       espSettingsIndex[i].len + SETTING_LEN);
         }
       }
     }
