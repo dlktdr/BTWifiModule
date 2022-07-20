@@ -42,13 +42,13 @@ void saveSettings()
  }
 }
 
-void _loadSettings(settings_t *s) 
+void _loadSettings(settings_t *s)
 {
   ESP_LOGI(LOG_SET,"Reading settings");
   size_t length = sizeof(settings_t);
   esp_err_t ret = nvs_get_blob(nvs_flsh_btw, NVS_STRUCT_KEY, (void*)s, &length);
   if(ret == ESP_OK && length == sizeof(settings_t)) {
-    ESP_LOGI(LOG_SET, "Settings Read Successfully");    
+    ESP_LOGI(LOG_SET, "Settings Read Successfully");
     return;
   } else {
     if(ret == ESP_OK) {
@@ -65,7 +65,18 @@ void loadSettings()
 {
   // Load settings into global settings struct.
   _loadSettings(&settings);
-  
+
   // Will be filled properly here or nulled out
   settings_ok = true;
+
+  // Fill the Radio Specific Settings
+  strcpy(espSettings.blemac, settings.blemac);
+  strcpy(espSettings.ip, settings.ip);
+  strcpy(espSettings.name, settings.name);
+  strcpy(espSettings.ssid, settings.ssid);
+  strcpy(espSettings.staticip, settings.staticip);
+  strcpy(espSettings.subnet, settings.subnet);
+  strcpy(espSettings.wifimac, settings.wifimac);
+  espSettings.dhcpMode = settings.dhcpMode;
+  espSettings.wifiStationMode = settings.wifiStationMode;
 }

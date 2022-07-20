@@ -20,33 +20,6 @@ void connectionCommandRX(int conCmd, const uint8_t *data, int len) {
   case ESP_CON_DISCONNECT:
     ESP_LOGI(CON_MGR_TAG, "Disconnect");
     break;
-  case ESP_CON_SET_NAME:
-    ESP_LOGI(CON_MGR_TAG, "Setting name=%s", (const char *)data);
-    break;
-  case ESP_CON_SET_MAC:
-    ESP_LOGI(CON_MGR_TAG, "Setting mac=%s", (const char *)data);
-    break;
-  case ESP_CON_SET_SSID:
-    ESP_LOGI(CON_MGR_TAG, "Setting ssid=%s", (const char *)data);
-    break;
-  case ESP_CON_SET_IP:
-    ESP_LOGI(CON_MGR_TAG, "Setting id=%s", (const char *)data);
-    break;
-  case ESP_CON_SET_SUBNET_MASK:
-    ESP_LOGI(CON_MGR_TAG, "Setting subnetmask=%s", (const char *)data);
-    break;
-  case ESP_CON_SET_STATIC_IP:
-    ESP_LOGI(CON_MGR_TAG, "Setting to static ip mode");
-    break;
-  case ESP_CON_SET_DHCP:
-    ESP_LOGI(CON_MGR_TAG, "Setting DHCP=%s", (const char *)data);
-    break;
-  case ESP_CON_SET_WIFI_STATION:
-    ESP_LOGI(CON_MGR_TAG, "Setting WIFI to station mode");
-    break;
-  case ESP_CON_SET_WIFI_AP:
-    ESP_LOGI(CON_MGR_TAG, "Setting WIFI to ap mode");
-    break;
   }
 }
 

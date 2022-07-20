@@ -9,6 +9,15 @@ typedef struct {
   // otherwise ignore
   char rmtbtaddr[13];
   uint8_t mode;
+  char name[40];
+  char wifimac[18];
+  char blemac[18];
+  char ssid[30];
+  char ip[16];
+  char subnet[16];
+  char staticip[16];
+  uint8_t dhcpMode;
+  uint8_t wifiStationMode;
 } settings_t;
 
 extern settings_t settings;

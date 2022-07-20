@@ -6,11 +6,26 @@
 #include "esptrainer.h"
 #include "terminal.h"
 #include <stdint.h>
+#include <string.h>
 
 #define LOG_ESPR "ESPROOT"
 
 // TODO, Replace me with git SHA
 espversion espVersion = {1, 0, 0, "GITTAG"};
+
+// Global ESP Settings
+espsettings espSettings;
+const espsettingslink espSettingsIndex[] = {
+    SETTING_LINK_ARR("name",
+                     espSettings.name), // Settings must be 4 characters!
+    SETTING_LINK_ARR("wmac", espSettings.wifimac),
+    SETTING_LINK_ARR("btma", espSettings.blemac),
+    SETTING_LINK_ARR("ssid", espSettings.ssid),
+    SETTING_LINK_ARR("ip  ", espSettings.ip),
+    SETTING_LINK_ARR("subn", espSettings.subnet),
+    SETTING_LINK_ARR("stip", espSettings.staticip),
+    SETTING_LINK_VAR("dhcp", espSettings.dhcpMode),
+    SETTING_LINK_VAR("wimd", espSettings.wifiStationMode)};
 
 int g_rv;
 uint8_t g_m;
@@ -20,20 +35,32 @@ bool g_radioIsWIFI = false;
 
 #define STARTBLE_MODE(m, x)                                                    \
   g_rv = x;                                                                    \
-  if (g_rv == 0)                                                               \
-    g_radioIsBLE = true;
+  g_m = m;                                                                     \
+  if (g_rv == 0) {                                                             \
+    g_radioIsBLE = true;                                                       \
+    writeCommand(ESP_ROOT, ESP_ROOTCMD_START_MODE, &g_m, 1);                   \
+  } else {                                                                     \
+    writeCommand(ESP_ROOT, ESP_ROOTCMD_STOP_MODE, &g_m, 1);                    \
+  }
+
 #define STARTBTEDR_MODE(m, x)                                                  \
   g_rv = x;                                                                    \
-  if (g_rv == 0)                                                               \
-    g_radioIsBTEDR = true;
+  g_m = m;                                                                     \
+  if (g_rv == 0) {                                                             \
+    g_radioIsBTEDR = true;                                                     \
+    writeCommand(ESP_ROOT, ESP_ROOTCMD_START_MODE, &g_m, 1);                   \
+  } else {                                                                     \
+    writeCommand(ESP_ROOT, ESP_ROOTCMD_STOP_MODE, &g_m, 1);                    \
+  }
+
 #define STARTWIFI_MODE(m, x)                                                   \
   g_rv = x;                                                                    \
-  g_m = m;
+  g_m = m;                                                                     \
   if (g_rv == 0) {                                                             \
     g_radioIsWIFI = true;                                                      \
-    writeCommand(ESP_ROOT, ESP_ROOTCMD_START_MODE, &m, 1);                     \
+    writeCommand(ESP_ROOT, ESP_ROOTCMD_START_MODE, &g_m, 1);                   \
   } else {                                                                     \
-    writeCommand(ESP_ROOT, ESP_ROOTCMD_STOP_MODE, &m, 1);                      \
+    writeCommand(ESP_ROOT, ESP_ROOTCMD_STOP_MODE, &g_m, 1);                    \
   }
 
 #define START_MODE(m, x) writeAckNak(m, x, "");
@@ -149,5 +176,44 @@ void espRootCommand(uint8_t command, const uint8_t *data, uint8_t len) {
     ESP_LOGI(LOG_ESPR, "Con Mgr. Cmd %d", data[0]);
     connectionCommandRX(data[0], data + 1, len - 1);
     break;
+  case ESP_ROOTCMD_SET_VALUE: {
+    // First 4 Characters are the Variable, Remainder is the Data
+    if (len > 5) {
+      char variable[5];
+      memcpy(variable, data, 4);
+      variable[4] = '\0';
+      ESP_LOGI("SETT", "Radio Set %s", variable);
+      for (unsigned int i = 0; i < SETTINGS_COUNT; i++) {
+        if (!strcmp(variable, espSettingsIndex[i].variable)) {
+          // Found the variable, make sure it's the same size
+          if (len - SETTING_LEN == espSettingsIndex[i].len) {
+            memcpy(espSettingsIndex[i].ptr, data + 4, len - 4);
+            ESP_LOGI("SETT", "Radio Set Success");
+          }
+          break;
+        }
+      }
+    }
+    break;
+  }
+  case ESP_ROOTCMD_GET_VALUE: {
+    uint8_t buffer[50];
+    // First 4 Characters are the Variable, Remainder is the Data
+    if (len == 4) {
+      char variable[5];
+      memcpy(variable, data, 4);
+      variable[4] = '\0';
+      ESP_LOGI("SETT", "Radio Requesting %s", variable);
+      for (unsigned int i = 0; i < SETTINGS_COUNT; i++) {
+        if (!strcmp(variable, espSettingsIndex[i].variable)) {
+          ESP_LOGI("SETT", "Found Variable.. Sending");
+          memcpy(buffer, espSettingsIndex[i].variable, SETTING_LEN);
+          memcpy(buffer+4, espSettingsIndex[i].ptr, espSettingsIndex[i].len);
+          writeCommand(ESP_ROOT, ESP_ROOTCMD_SET_VALUE, buffer, espSettingsIndex[i].len+SETTING_LEN);
+        }
+      }
+    }
+    break;
+  }
   }
 }
