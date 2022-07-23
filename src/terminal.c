@@ -10,6 +10,7 @@
 #include "bt.h"
 #include "bt_client.h"
 #include "bt_server.h"
+#include "joystick/bt_joystick.h"
 #include "defines.h"
 #include "settings.h"
 
@@ -199,7 +200,7 @@ void runUARTHead() {
   ESP_LOGI(LOG_UART, "Setting initial role");
   if(settings.role == ROLE_UNKNOWN) {
     ESP_LOGE(LOG_UART, "Invalid role loaded, defaulting to central");
-    settings.role = ROLE_BLE_CENTRAL;
+    settings.role = ROLE_BLE_PERIPHERAL;
   }
   setRole(settings.role);
 
@@ -255,11 +256,13 @@ void setRole(role_t role)
   ESP_LOGI(LOG_UART,"Switching from mode %d to %d", curMode, role);
   if(role == curMode) return;
 
+  if(role > 1)
+    role = 0;
   // Shutdown
   switch(curMode) {
     case ROLE_BLE_CENTRAL:
     case ROLE_BLE_PERIPHERAL:
-    default:
+    default:      
       break;
   }
 
@@ -277,7 +280,7 @@ void setRole(role_t role)
     case ROLE_BLE_PERIPHERAL:
       btPeripherialState = PERIPHERIAL_STATE_DISCONNECTED;
       bt_init();
-      btpInit();
+      btjoyInit();
       break;
     default:
       break;
@@ -371,7 +374,7 @@ void runBTPeripherial()
 {
   switch(btPeripherialState) {
     case PERIPHERIAL_STATE_DISCONNECTED:
-      if(btp_connected) {
+      if(btjoystickconnected) {
           // Save Remote Address
           btaddrtostr(rmtaddress, rmtbtaddress);
           sprintf(reusablebuff, "Connected:%s\r\n", rmtaddress);
@@ -380,7 +383,7 @@ void runBTPeripherial()
       }
       break;
     case PERIPHERIAL_STATE_CONNECTED:
-      if(!btp_connected) {
+      if(!btjoystickconnected) {
         btPeripherialState = PERIPHERIAL_STATE_DISCONNECTED;
         uart_write_bytes(uart_num, "DisConnected\r\nERROR\r\nERROR\r\n",28);
       }
