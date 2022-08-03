@@ -71,7 +71,7 @@ jobs:
       - name: Build Firmware RM_pico
         run: |
           cd /src
-          pio run -e RM_Pico
+          pio run -e RM_pico
           
 
       # Runs a set of commands using the runners shell
