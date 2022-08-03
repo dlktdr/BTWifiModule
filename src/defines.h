@@ -8,6 +8,12 @@
 #define UART_TXPIN 4
 #define UART_RXPIN 5
 
+#elif defined(PCB_RMPICO)
+
+#define UART_NUM UART_NUM_0
+#define UART_RXPIN 3
+#define UART_TXPIN 1
+
 #elif defined(PCB_WROOM)
 
 #define UART_NUM UART_NUM_2

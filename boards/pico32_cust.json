@@ -10,7 +10,7 @@
     "flash_mode": "dio",
     "mcu": "esp32",
     "variant": "pico32",
-    "partitions": "partitions.csv"
+    "partitions": "pico_partitions.csv"
   },
   "connectivity": [
     "wifi",
