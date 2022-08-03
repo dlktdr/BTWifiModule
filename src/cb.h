@@ -15,34 +15,43 @@ typedef struct circular_buffer
 
 void cb_init(circular_buffer *cb, size_t capacity)
 {
-    cb->buffer = malloc(capacity);
-    if(cb->buffer == NULL) {
-        // TODO: handle error
-    }
-    cb->buffer_end = cb->buffer + capacity;
-    cb->capacity = capacity;
-    cb->count = 0;
-    cb->head = cb->buffer;
-    cb->tail = cb->buffer;
+  cb->buffer = (char*)malloc(capacity);
+  if(cb->buffer == NULL) {
+      // TODO: handle error
+  }
+  cb->buffer_end = cb->buffer + capacity;
+  cb->capacity = capacity;
+  cb->count = 0;
+  cb->head = cb->buffer;
+  cb->tail = cb->buffer;
+}
+
+void cb_clear(circular_buffer *cb)
+{
+  cb->buffer_end = cb->buffer + cb->capacity;
+  cb->capacity = cb->capacity;
+  cb->count = 0;
+  cb->head = cb->buffer;
+  cb->tail = cb->buffer;
 }
 
 void cb_free(circular_buffer *cb)
 {
-    free(cb->buffer);    
+  free(cb->buffer);
 }
 
 int cb_push_back(circular_buffer *cb, char *item)
 {
-    if(cb->count == cb->capacity)
-        return -1;
+  if(cb->count == cb->capacity)
+    return -1;
 
-    *cb->head = *item;
+  *cb->head = *item;
 
-    cb->head++;
-    if(cb->head == cb->buffer_end)
-        cb->head = cb->buffer;
-    cb->count++;
-    return 0;
+  cb->head++;
+  if(cb->head == cb->buffer_end)
+    cb->head = cb->buffer;
+  cb->count++;
+  return 0;
 }
 
 int cb_pop_front(circular_buffer *cb, char *item)
