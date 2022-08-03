@@ -68,7 +68,7 @@ jobs:
           cd /src
           pio run -e C3Mini
           
-      - name: Build Firmware RM_Pico
+      - name: Build Firmware RM_pico
         run: |
           cd /src
           pio run -e RM_Pico
