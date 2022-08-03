@@ -67,6 +67,12 @@ jobs:
         run: |
           cd /src
           pio run -e C3Mini
+          
+      - name: Build Firmware RM_Pico
+        run: |
+          cd /src
+          pio run -e RM_Pico
+          
 
       # Runs a set of commands using the runners shell
       - name: Package Firmware
