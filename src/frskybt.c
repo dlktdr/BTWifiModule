@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include "frskybt.h"
 #include "bt_server.h"
+#include "joystick/bt_joystick.h"
+#include "joystick/esp_hidd_prf_api.h"
 #include "settings.h"
 #include "esp_log.h"
 
@@ -125,6 +127,9 @@ void processTrainerFrame(const uint8_t * otxbuffer)
 
   // If the data came from the radio, send it out over bluetooth. Send same data but add the START_STOP
   if(settings.role == ROLE_BLE_PERIPHERAL) {
+    if(btjoystickconnected) {
+      hid_SendJoystickChannels(channeldata);
+    }
     btp_sendChannelData(_otxbuffer, otxbufferIndex+1);
   }
 }
@@ -195,7 +200,7 @@ void frSkyProcessByte(uint8_t data)
     if (crc == otxbuffer[BLUETOOTH_PACKET_SIZE - 1]) {
       if (otxbuffer[0] == TRAINER_FRAME) {
         processTrainerFrame(otxbuffer);
-        logBTFrame(true, "");
+        //logBTFrame(true, "");
       } else {
         logBTFrame(false, "Not a trainer frame");
       }
