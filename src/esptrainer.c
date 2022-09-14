@@ -10,6 +10,7 @@
 
 bool trainerstarted = false;
 bool trainerismaster = false;
+bool isDiscoveryStarted = false;
 
 int espTrainerStart() {
   if (trainerstarted)
@@ -20,19 +21,19 @@ int espTrainerStart() {
     // Start Master Mode
     BTInit();
     btpInit();
-    /*writeCommand(ESP_TRAINER,
+    writeCommand(ESP_TRAINER,
                  ESP_TRAINERCMD_SET_MASTER,
                  NULL,
-                 0);*/
+                 0);
   } else {
     ESP_LOGI(TRAINER_TAG, "Trainer Slave Start");
     // Start Slave Mode
     BTInit();
     btcInit();
-    /*writeCommand(ESP_TRAINER,
-              ESP_TRAINERCMD_SET_MASTER,
-              NULL,
-              0);*/
+    writeCommand(ESP_TRAINER,
+                ESP_TRAINERCMD_SET_MASTER,
+                NULL,
+                0);
   }
 
   trainerstarted = true;
@@ -47,6 +48,11 @@ void espTrainerStop() {
 }
 
 bool espTrainerRunning() { return trainerstarted; }
+
+void espTrainerExec()
+{
+
+}
 
 // Trainer data received
 void espTrainerData(const uint8_t *data, uint8_t len) {
@@ -86,4 +92,41 @@ void espTrainerCommand(uint8_t command, const uint8_t *data, uint8_t len) {
 
 void espTrainerSend(const channeldata *chans) {
   writePacket((const uint8_t *)chans, sizeof(channeldata), false, ESP_TRAINER);
+}
+
+void espTrainerDiscoverStart()
+{
+  ESP_LOGI(TRAINER_TAG, "Trainer Discovery Requested");
+  if(isDiscoveryStarted || !trainerismaster) {
+    ESP_LOGE(TRAINER_TAG, "Discovery already started or not master mode");
+    return;
+  }
+  btc_start_scan();
+  writeEvent(ESP_EVT_DISCOVER_STARTED, NULL, 0);
+  isDiscoveryStarted = true;
+}
+
+void espTrainerDeviceDiscovered(const char *address)
+{
+  ESP_LOGI(TRAINER_TAG, "Device discovered %s", address);
+  writeEvent(ESP_EVT_DEVICE_FOUND, (uint8_t*)address, strlen(address)+1);
+}
+
+void espTrainerRFDataReceived(const channeldata *chans)
+{
+
+}
+
+void espTrainerDiscoverComplete()
+{
+  ESP_LOGI(TRAINER_TAG, "Discoverery Complete");
+  writeEvent(ESP_EVT_DISCOVER_COMPLETE, NULL, 0);
+  isDiscoveryStarted = false;
+}
+
+void espTrainerDiscoverStop()
+{
+  ESP_LOGI(TRAINER_TAG, "Trainer Discovery Stop Requested");
+  isDiscoveryStarted = false;
+
 }

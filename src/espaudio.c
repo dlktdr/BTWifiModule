@@ -16,6 +16,11 @@ void espAudioStop()
 
 }
 
+void espAudioExec()
+{
+
+}
+
 bool espAudioRunning()
 {
   return false;

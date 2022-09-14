@@ -65,7 +65,7 @@ bool g_radioIsWIFI = false;
   }
 
 #define START_MODE(m, x) writeAckNak(m, x, "");
-#define RADIO_USED() (g_radioIsBTEDR || g_radioIsBLE || g_radioIsWIFI)
+#define RADIO_USED (g_radioIsBTEDR || g_radioIsBLE || g_radioIsWIFI)
 
 uint8_t runningModes;
 
@@ -78,15 +78,15 @@ void espRootCommand(uint8_t command, const uint8_t *data, uint8_t len) {
   case ESP_ROOTCMD_START_MODE:
     if (len != 1)
       break;
-    ESP_LOGI(LOG_ESPR, "Starting Mode %d", data[0]);
-    if (RADIO_USED() && ((data[0] == ESP_TELEMETRY || data[0] == ESP_TRAINER ||
+    ESP_LOGI(LOG_ESPR, "Root Cmd RX: Starting Mode %d", data[0]);
+    if (RADIO_USED && ((data[0] == ESP_TELEMETRY || data[0] == ESP_TRAINER ||
                           data[0] == ESP_JOYSTICK || data[0] == ESP_AUDIO ||
                           data[0] == ESP_FTP))) {
       ESP_LOGE(LOG_ESPR, "Cannot start Radio already used");
     } else {
       switch (data[0]) {
       case ESP_TELEMETRY:
-        // STARTRADIO_MODE(ESP_TELEMETRY, espTelemetryStart());
+        STARTBTEDR_MODE(ESP_TELEMETRY, espTelemetryStart());
         break;
       case ESP_TRAINER:
         STARTBLE_MODE(ESP_TRAINER, espTrainerStart());
@@ -112,14 +112,13 @@ void espRootCommand(uint8_t command, const uint8_t *data, uint8_t len) {
   case ESP_ROOTCMD_STOP_MODE:
     if (len != 1)
       break;
-    ESP_LOGI(LOG_ESPR, "Stopping Mode %d", data[0]);
+    ESP_LOGI(LOG_ESPR, "Root Cmd RX: Stopping Mode %d", data[0]);
     switch (data[0]) {
     case ESP_TELEMETRY:
-      //   if(espTelemetryRunning()) {
-      //     espTelemetryStop();
-      //  g_radioIsBTEDR = false; // WHAT TO DO, I COULD SEE BOTH..
-      //   probably EDR with a serial port tho
-      //   }
+      if(espTelemetryRunning()) {
+        espTelemetryStop();
+        g_radioIsBTEDR = false;
+      }
       break;
     case ESP_TRAINER:
       if (espTrainerRunning()) {
@@ -156,28 +155,37 @@ void espRootCommand(uint8_t command, const uint8_t *data, uint8_t len) {
     }
     break;
 
+  case ESP_ROOTCMD_ACTIVE_MODES:
+    ESP_LOGI(LOG_ESPR, "Root Cmd RX: Get Active Modes");
+
   case ESP_ROOTCMD_RESTART:
-    ESP_LOGI(LOG_ESPR, "Rebooting...");
+    ESP_LOGI(LOG_ESPR, "Root Cmd RX: Rebooting...");
     esp_restart();
     break;
+
   case ESP_ROOTCMD_VERSION:
     writeCommand(ESP_ROOT, ESP_ROOTCMD_VERSION, (const uint8_t *)&espVersion,
                  sizeof(espversion));
     break;
+
   case ESP_ROOTCMD_CON_EVENT: // Shouldn't be much here, events are generated
-                              // here
+    ESP_LOGI(LOG_ESPR, "Root Cmd RX: Connection Event");
     if (len < 1)
       break;
-    ESP_LOGI(LOG_ESPR, "Con Mgr. Event %d", data[0]);
+    ESP_LOGI(LOG_ESPR, "  Con Mgr. Event %d", data[0]);
     connectionEventRX(data[0], data + 1, len - 1);
     break;
+
   case ESP_ROOTCMD_CON_MGMNT:
+    ESP_LOGI(LOG_ESPR, "Root Cmd RX: Connection Command Received");
     if (len < 1)
       break;
-    ESP_LOGI(LOG_ESPR, "Con Mgr. Cmd %d", data[0]);
+    ESP_LOGI(LOG_ESPR, "  Con Mgr. Cmd %d", data[0]);
     connectionCommandRX(data[0], data + 1, len - 1);
     break;
+
   case ESP_ROOTCMD_SET_VALUE: {
+    ESP_LOGI(LOG_ESPR, "Root Cmd RX: Setting, Setting value");
     // First 4 Characters are the Variable, Remainder is the Data
     if (len > 4) {
       char variable[5];
@@ -198,6 +206,7 @@ void espRootCommand(uint8_t command, const uint8_t *data, uint8_t len) {
     break;
   }
   case ESP_ROOTCMD_GET_VALUE: {
+    ESP_LOGI(LOG_ESPR, "Root Cmd RX: Setting, Requested value");
     uint8_t buffer[50];
     // First 4 Characters are the Variable, Remainder is the Data
     if (len == 4) {

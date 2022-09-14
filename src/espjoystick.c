@@ -29,6 +29,11 @@ void espJoystickStop() {
 
 bool espJoystickRunning() { return joystickstarted; }
 
+void espJoystickExec()
+{
+
+}
+
 void espJoystickData(const uint8_t *data, uint8_t len) {
   if (len == sizeof(channeldata)) {
     /*const channeldata *chdata = (const channeldata *)data;
@@ -45,3 +50,5 @@ void espJoystickData(const uint8_t *data, uint8_t len) {
 }
 
 void espJoystickCommand(uint8_t command, const uint8_t *data, uint8_t len) {}
+void espJoystickDiscoverStart() {}
+void espJoystickDiscoverStop() {}

@@ -20,6 +20,8 @@
 #include "espjoystick.h"
 #include "esproot.h"
 #include "esptrainer.h"
+#include "esptelemetry.h"
+
 #include "freertos/stream_buffer.h"
 
 #define DEBUG_PACKETS
@@ -32,29 +34,28 @@ const char *ESPRootCmdsStr[] = {"Start Mode", "Stop Mode", "Active Modes",
 const char *ESPModesStr[] = {"Root",  "Telemetry", "Trainer", "Joystick",
                              "Audio", "FTP",       "IMU"};
 
-#define DEBUG_PACKET(pkt)                                                   \
-  if (!ESP_PACKET_ISCMD(pkt->type))                                         \
-    printf("RX[D] Mode-%s Len-%d\r\n",                                         \
-           ESPModesStr[pkt->type & ESP_PACKET_TYPE_MSK], pkt->len);      \
-  else if (ESP_PACKET_ISACK(pkt->type))                                     \
-    printf("TX[C] Mode-%s (Acknowledge)\r\n",                                  \
-           ESPModesStr[pkt->type & ESP_PACKET_TYPE_MSK]);                   \
-  else if (pkt->type == ESP_ROOT)                                           \
-    printf("TX[C] Mode-%s Cmd-%s Len-%d\r\n",                                  \
-           ESPModesStr[pkt->type & ESP_PACKET_TYPE_MSK],                    \
-           ESPRootCmdsStr[pkt->data[0]], pkt->len - 1);                  \
+#define DEBUG_PACKET(rxtx, pkt)                                                      \
+  if (!ESP_PACKET_ISCMD(pkt->type))                                            \
+    printf("%cX[D] Mode-%s Len-%d\r\n", rxtx,                                  \
+           ESPModesStr[pkt->type & ESP_PACKET_TYPE_MSK], pkt->len);            \
+  else if (ESP_PACKET_ISACK(pkt->type))                                        \
+    printf("%cX[C] Mode-%s (Acknowledge)\r\n", rxtx,                           \
+           ESPModesStr[pkt->type & ESP_PACKET_TYPE_MSK]);                      \
+  else if (pkt->type == ESP_ROOT)                                              \
+    printf("%cX[C] Mode-%s Cmd-%s Len-%d\r\n", rxtx,                           \
+           ESPModesStr[pkt->type & ESP_PACKET_TYPE_MSK],                       \
+           ESPRootCmdsStr[pkt->data[0]], pkt->len - 1);                        \
   else                                                                         \
-    printf("RX[C] Mode-%s Cmd-0x%0.2x Len-%d\r\n",                             \
-           ESPModesStr[pkt->type & ESP_PACKET_TYPE_MSK], pkt->data[0],   \
+    printf("%cX[C] Mode-%s Cmd-0x%0.2x Len-%d\r\n", rxtx,                      \
+           ESPModesStr[pkt->type & ESP_PACKET_TYPE_MSK], pkt->data[0],         \
            pkt->len - 1);
 #else
-#define DEBUG_PACKET(packet)
+#define DEBUG_PACKET(rxtx, packet)
 #endif
 
 #define LOG_UART "UART"
 
 #define UART_RX_BUFFER 1024
-#define REUSABLE_BUFFER 250
 #define AT_CMD_MAX_LEN 40
 #define BT_CMD_MAX_LEN 30
 
@@ -89,7 +90,6 @@ int64_t baudTimer = 0;
 int laddcnt = 0;
 
 char rmtaddress[13] = "000000000000";
-char reusablebuff[REUSABLE_BUFFER];
 
 void sendBTMode() {}
 
@@ -110,7 +110,7 @@ int atcommandlen = -1;
 circular_buffer uartinbuf;
 
 void processPacket(const packet_s *packet) {
-  DEBUG_PACKET(packet);
+  //DEBUG_PACKET('R', packet);
 
   // Acknowledge we got the command
   if (ESP_PACKET_ISCMD(packet->type) && !ESP_PACKET_ISACK(packet->type)) {
@@ -204,13 +204,19 @@ void mainTask(void *stuff) {
       }
     }
 
-    // TEST SENDING PACKETS
-    /*    static uint count=0;
-        if(count++ % 20 == 0) {
-          printf("Writting: Hello, Mode=2\r\n");
-          writePacket("Hello",5,false,2);
-          writeCommand(1,3,"DATA",4);
-        }*/
+    // Call all the functions to run
+    espTelemetryExec();
+    espTrainerExec();
+    espJoystickExec();
+    espAudioExec();
+
+    // Test Sending Packets
+    static uint count = 0;
+    if (count++ % 20 == 0) {
+      //writeData(ESP_TRAINER, "HelloASDF", 9);
+      //uart_write_bytes(uart_num, "FEST", 4);
+      //writeCommand(ESP_TRAINER,ESP_TRAINERCMD_SET_MASTER,"DATA",4);
+    }
   }
   vTaskDelete(NULL);
 }
@@ -359,11 +365,15 @@ void runBTPeripherial()
 
 // Builds a packet
 void writePacket(const uint8_t *dat, int len, bool iscmd, uint8_t mode) {
+  if(len > ESP_MAX_PACKET_DATA) {ESP_LOGE("TERM", "Packet too Big"); return;}
   uint8_t encodedbuffer[sizeof(packet_s) + 1];
   packet_s packet;
   packet.type = mode;
-  if (iscmd)
+  packet.len = len;
+  if (iscmd) {
     packet.type |= (1 << ESP_PACKET_CMD_BIT);
+    packet.len -= 1;
+  }
   packet.crcl = 0xBB;
   packet.crch = 0xAA;
   memcpy(packet.data, dat,
@@ -377,20 +387,33 @@ void writePacket(const uint8_t *dat, int len, bool iscmd, uint8_t mode) {
   encodedbuffer[wl] = '\0';
   uart_write_bytes(uart_num, (void *)&encodedbuffer, wl + 1);
 
-  DEBUG_PACKET((&packet));
+  //ESP_LOG_BUFFER_HEX("TX",encodedbuffer, wl+1);
+  //DEBUG_PACKET('T', (&packet));
 }
 
 // Sends some data
 void writeData(uint8_t mode, const uint8_t *dat, int len) {
+  if(len > ESP_MAX_PACKET_DATA) return;
   writePacket(dat, len, false, mode);
 }
 
 // Send a command
 void writeCommand(uint8_t mode, uint8_t command, const uint8_t *dat, int len) {
-  uint8_t buffer[256];
+  if(len > ESP_MAX_PACKET_DATA-1) return;
+  uint8_t buffer[ESP_MAX_PACKET_DATA-1];
   buffer[0] = command; // First byte of a command is the command, data follows
   memcpy(buffer + 1, dat, len);
   writePacket(buffer, len + 1, true, mode);
+}
+
+void writeEvent(uint8_t event, const uint8_t* dat, int len)
+{
+  if(len > ESP_MAX_PACKET_DATA-2) return;
+  uint8_t buffer[ESP_MAX_PACKET_DATA-1];
+  buffer[0] = ESP_ROOTCMD_CON_EVENT;
+  buffer[1] = event;
+  memcpy(buffer + 2, dat, len);
+  writePacket(buffer, len + 2, true, ESP_ROOT);
 }
 
 // Writes an acknowledge / not-acknowledge and a optional message

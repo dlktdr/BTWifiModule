@@ -39,6 +39,8 @@
 #include "terminal.h"
 #include "defines.h"
 
+#include "esptrainer.h"
+
 #define GATTC_TAG "BTCLIENT"
 #define REMOTE_SERVICE_UUID        0xFFF0
 #define REMOTE_FRSKY_CHAR_UUID     0xFFF6
@@ -353,7 +355,10 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
 #ifdef DEBUG_TIMERS
           processFrame(p_data->notify.value,p_data->notify.value_len); // Used to decode the channel data for debugging
 #endif
-          uart_write_bytes(uart_num, (void*)p_data->notify.value, p_data->notify.value_len); // Write the received data to the UART port
+
+          // TODO.. fixme
+          //   espTrainerRFDataReceived()
+          // uart_write_bytes(uart_num, (void*)p_data->notify.value, p_data->notify.value_len); // Write the received data to the UART port
 
            // if(p_data->notify.handle == bt_datahandle) // If notify coming from the data handle, send it to the UART port
           //  else
@@ -450,10 +455,11 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
                 btaddrtostr(addr, scan_result->scan_rst.bda);
                 printf("Disc BT Address %s, RSSI=%d, Addr Type=%d\n",addr, scan_result->scan_rst.rssi,
                 scan_result->scan_rst.ble_addr_type);
+                espTrainerDeviceDiscovered(addr);
                 break;
             }
             case ESP_GAP_SEARCH_INQ_CMPL_EVT: {
-                btc_scan_complete = true;
+                espTrainerDiscoverComplete();
                 break;
             }
             default: {
@@ -606,10 +612,11 @@ void btcInit()
   uint8_t adrtype;
   esp_ble_gap_get_local_used_addr(localbtaddress, &adrtype);
 
-
   vTaskDelay(pdMS_TO_TICKS(500));
-  // Try to connect to saved address on startup
+
+  /*
+  // Try to connect to saved address on startup.. // Leave me up to the radio
   esp_bd_addr_t addr;
-  strtobtaddr(addr, settings.rmtbtaddr);
+  strtobtaddr(addr, settings.rmtbtaddr);*/
   //btc_connect(addr);
 }
