@@ -33,10 +33,8 @@
 
 #endif
 
-#define UART_RX_BUFFER 512
-#define UART_TX_BUFFER 512
 #define BAUD_RESET_TIMER 1000000 // us
-#define BAUD_DEFAULT 115200
+#define BAUD_DEFAULT 576000
 #define BAUD_MAXIMUM 921600
 
 // Optional Debugging Options
@@ -51,6 +49,7 @@ typedef enum {
   ROLE_UNKNOWN=0,
   ROLE_BLE_PERIPHERAL,
   ROLE_BLE_CENTRAL,
+  ROLE_BLE_JOYSTICK,
   ROLE_ADVANCE,
   ROLE_COUNT
 } role_t;

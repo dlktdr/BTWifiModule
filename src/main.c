@@ -44,11 +44,16 @@ void runBlinky() {
 }
 #endif
 
-void app_main(void) {
-
+void app_main(void)
+{
   TaskHandle_t tUartHnd = NULL;
-  xTaskCreate(runUARTHead, "UART", 4096, NULL, tskIDLE_PRIORITY+2, &tUartHnd);
-  configASSERT(tUartHnd);
+  xTaskCreate(mainTask, "UART", 65535, NULL, tskIDLE_PRIORITY+1, &tUartHnd);
+  //configASSERT(tUartHnd);
+
+  TaskHandle_t tUartRxHnd = NULL;
+  xTaskCreate(uartRXTask, "UARTRX", 2048, NULL, tskIDLE_PRIORITY+8, &tUartRxHnd);
+  //configASSERT(tUartHnd);
+
 
 #if defined(LEDPIN)
   TaskHandle_t tBlinkHnd = NULL;
