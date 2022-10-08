@@ -16,26 +16,27 @@
  *
  ****************************************************************************/
 
+#include "bt.h"
+#include "defines.h"
+#include "driver/adc.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
-#include "driver/adc.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
-#include "terminal.h"
 #include "nvs_flash.h"
-#include "bt.h"
-#include "defines.h"
 #include "settings.h"
+#include "terminal.h"
 
 nvs_handle_t nvs_flsh_btw;
 
 #if defined(LEDPIN)
-void runBlinky() {
+void runBlinky()
+{
   gpio_set_direction(LEDPIN, GPIO_MODE_DEF_OUTPUT);
-  for(;;) {
+  for (;;) {
     gpio_set_level(LEDPIN, 0);
     vTaskDelay(pdMS_TO_TICKS(100));
     gpio_set_level(LEDPIN, 1);
@@ -44,10 +45,10 @@ void runBlinky() {
 }
 #endif
 
-void app_main(void) {
-
+void app_main(void)
+{
   TaskHandle_t tUartHnd = NULL;
-  xTaskCreate(runUARTHead, "UART", 4096, NULL, tskIDLE_PRIORITY+2, &tUartHnd);
+  xTaskCreate(runUARTHead, "UART", 4096, NULL, tskIDLE_PRIORITY + 2, &tUartHnd);
   configASSERT(tUartHnd);
 
 #if defined(LEDPIN)
@@ -60,14 +61,13 @@ void app_main(void) {
 
   /* Initialize NVS. */
   ret = nvs_flash_init();
-  if (ret == ESP_ERR_NVS_NO_FREE_PAGES ||
-      ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
     ESP_ERROR_CHECK(nvs_flash_erase());
     ret = nvs_flash_init();
   }
   ESP_ERROR_CHECK(ret);
 
-  ESP_ERROR_CHECK(nvs_open("btwifi",NVS_READWRITE, &nvs_flsh_btw));
+  ESP_ERROR_CHECK(nvs_open("btwifi", NVS_READWRITE, &nvs_flsh_btw));
 
   loadSettings();
 }

@@ -11,8 +11,8 @@
 #define BT_CHANNELS 8
 
 enum {
-  BT_CRC_FAULT=-1,
-  BT_SUCCESS=0,
+  BT_CRC_FAULT = -1,
+  BT_SUCCESS = 0,
 };
 
 int setTrainer(uint8_t *addr, uint16_t chan_vals[BT_CHANNELS]);

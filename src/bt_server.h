@@ -7,10 +7,10 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 
 void btpInit();
 void btp_disconnect();

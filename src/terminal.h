@@ -10,10 +10,10 @@
 
 // Packet Format
 typedef struct {
-  uint8_t len;       // Data length. Max 255 per packet
-  uint8_t type;      // Packet Type
-  uint8_t data[256]; // User Data
-  uint16_t crc;      // CRC16:xxxx of the packet
+  uint8_t len;        // Data length. Max 255 per packet
+  uint8_t type;       // Packet Type
+  uint8_t data[256];  // User Data
+  uint16_t crc;       // CRC16:xxxx of the packet
 } packet_s;
 
 // Struct for a PACKET_TYPE_8_CHANNEL
@@ -50,9 +50,9 @@ typedef struct PACKED {
   uint16_t ch29 : 11;
   uint16_t ch30 : 11;
   uint16_t ch31 : 11;
-  uint16_t ch32 : 11; // 352 bits, 44 bytes
+  uint16_t ch32 : 11;  // 352 bits, 44 bytes
   uint32_t channelmask;
-} channeldata_s; // 48 bytes total
+} channeldata_s;  // 48 bytes total
 
 // Packet Type Field
 //    Bit [0:4] - Packet Type
@@ -64,15 +64,13 @@ typedef struct PACKED {
 //                1    (6:7) ACK required
 //    m m m m m 0 0 0  (0:5) Packet Type
 
-
-
 //    x x x x x x 1 x -
 // If Bit7 clear (type&^0x80) then,
 //   Type is defines as the below ennums
 // If Bit7 set then Bits0:6 = Remaining Packets to receive
 
 enum {
-  PACKET_TYPE_ACK=0,       // Got it.
+  PACKET_TYPE_ACK = 0,     // Got it.
   PACKET_TYPE_NAK,         // Didn't Ack, need resend
   PACKET_TYPE_SETMODE,     // Mode change request
   PACKET_TYPE_COMMAND,     // A Command (Do something in current mode)

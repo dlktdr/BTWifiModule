@@ -1,11 +1,13 @@
 /* From OpenTX https://github.com/opentx
  */
 
-#include <stdbool.h>
 #include "frskybt.h"
+
+#include <stdbool.h>
+
 #include "bt_server.h"
-#include "settings.h"
 #include "esp_log.h"
+#include "settings.h"
 
 #define FRSKYBT_TAG "FRSKYBT"
 
@@ -24,83 +26,73 @@ uint16_t channeldata[BT_CHANNELS];
 
 void logBTFrame(bool valid, char message[])
 {
-  static int64_t ltime =0;
+  static int64_t ltime = 0;
   int64_t timestamp = esp_timer_get_time() - ltime;
   ltime = esp_timer_get_time();
-  if(!valid) {
+  if (!valid) {
     ESP_LOGE(FRSKYBT_TAG, "(%05lld)Unable to decode data, %s", timestamp, message);
   } else {
-    ESP_LOGI(FRSKYBT_TAG, "(%05lld)Ch1[%04d] Ch2[%04d] Ch3[%04d] Ch4[%04d] Ch5[%04d] Ch6[%04d] Ch7[%04d] Ch8[%04d]",
-                     timestamp,
-                     channeldata[0],
-                     channeldata[1],
-                     channeldata[2],
-                     channeldata[3],
-                     channeldata[4],
-                     channeldata[5],
-                     channeldata[6],
-                     channeldata[7]);
+    ESP_LOGI(
+        FRSKYBT_TAG,
+        "(%05lld)Ch1[%04d] Ch2[%04d] Ch3[%04d] Ch4[%04d] Ch5[%04d] Ch6[%04d] Ch7[%04d] Ch8[%04d]",
+        timestamp, channeldata[0], channeldata[1], channeldata[2], channeldata[3], channeldata[4],
+        channeldata[5], channeldata[6], channeldata[7]);
   }
 }
 
-
-static uint8_t buffer[BLUETOOTH_LINE_LENGTH+1];
+static uint8_t buffer[BLUETOOTH_LINE_LENGTH + 1];
 static uint8_t bufferIndex;
 static uint8_t crc;
 
 void pushByte(uint8_t byte)
 {
-    crc ^= byte;
-    if (byte == START_STOP || byte == BYTE_STUFF) {
-        buffer[bufferIndex++] = BYTE_STUFF;
-        byte ^= STUFF_MASK;
-    }
-    buffer[bufferIndex++] = byte;
+  crc ^= byte;
+  if (byte == START_STOP || byte == BYTE_STUFF) {
+    buffer[bufferIndex++] = BYTE_STUFF;
+    byte ^= STUFF_MASK;
+  }
+  buffer[bufferIndex++] = byte;
 }
 
 /* Builds Trainer Data
-*     Returns the length of the encoded PPM + CRC
-*     Data saved into addr pointer
-*/
+ *     Returns the length of the encoded PPM + CRC
+ *     Data saved into addr pointer
+ */
 
 int setTrainer(uint8_t *addr, uint16_t chan_vals[BT_CHANNELS])
 {
-    // Allocate Channel Mappings, Set Default to all Center
-    uint8_t * cur = buffer;
-    bufferIndex = 0;
-    crc = 0x00;
+  // Allocate Channel Mappings, Set Default to all Center
+  uint8_t *cur = buffer;
+  bufferIndex = 0;
+  crc = 0x00;
 
-    buffer[bufferIndex++] = START_STOP; // start byte
-    pushByte(TRAINER_FRAME); // trainer frame type?
-    for (int channel=0; channel < BT_CHANNELS; channel+=2, cur+=3) {
-        uint16_t channelValue1 = chan_vals[channel];
-        uint16_t channelValue2 = chan_vals[channel+1];
+  buffer[bufferIndex++] = START_STOP;  // start byte
+  pushByte(TRAINER_FRAME);             // trainer frame type?
+  for (int channel = 0; channel < BT_CHANNELS; channel += 2, cur += 3) {
+    uint16_t channelValue1 = chan_vals[channel];
+    uint16_t channelValue2 = chan_vals[channel + 1];
 
-        pushByte(channelValue1 & 0x00ff);
-        pushByte(((channelValue1 & 0x0f00) >> 4) + ((channelValue2 & 0x00f0) >> 4));
-        pushByte(((channelValue2 & 0x000f) << 4) + ((channelValue2 & 0x0f00) >> 8));
-    }
+    pushByte(channelValue1 & 0x00ff);
+    pushByte(((channelValue1 & 0x0f00) >> 4) + ((channelValue2 & 0x00f0) >> 4));
+    pushByte(((channelValue2 & 0x000f) << 4) + ((channelValue2 & 0x0f00) >> 8));
+  }
 
-    buffer[bufferIndex++] = crc;
-    buffer[bufferIndex++] = START_STOP; // end byte
+  buffer[bufferIndex++] = crc;
+  buffer[bufferIndex++] = START_STOP;  // end byte
 
-    // Copy data to array
-    memcpy(addr,buffer,bufferIndex);
+  // Copy data to array
+  memcpy(addr, buffer, bufferIndex);
 
-    return bufferIndex;
+  return bufferIndex;
 }
 
 //----------------------------------
 // Receieve Code
 //----------------------------------
 
-enum {STATE_DATA_IDLE,
-STATE_DATA_START,
-STATE_DATA_XOR,
-STATE_DATA_IN_FRAME
-};
+enum { STATE_DATA_IDLE, STATE_DATA_START, STATE_DATA_XOR, STATE_DATA_IN_FRAME };
 
-static uint8_t _otxbuffer[BLUETOOTH_LINE_LENGTH+2] = {START_STOP};
+static uint8_t _otxbuffer[BLUETOOTH_LINE_LENGTH + 2] = {START_STOP};
 static uint8_t *otxbuffer = _otxbuffer + 1;
 uint8_t otxbufferIndex = 0;
 bool btprocessed = false;
@@ -110,22 +102,24 @@ void appendTrainerByte(uint8_t data)
   if (otxbufferIndex < BLUETOOTH_LINE_LENGTH) {
     otxbuffer[otxbufferIndex++] = data;
   } else {
-    ESP_LOGE(FRSKYBT_TAG,"OTX Buffer Overflow");
+    ESP_LOGE(FRSKYBT_TAG, "OTX Buffer Overflow");
     otxbufferIndex = 0;
   }
 }
 
-void processTrainerFrame(const uint8_t * otxbuffer)
+void processTrainerFrame(const uint8_t *otxbuffer)
 {
-  for (uint8_t channel=0, i=1; channel<BT_CHANNELS; channel+=2, i+=3) {
+  for (uint8_t channel = 0, i = 1; channel < BT_CHANNELS; channel += 2, i += 3) {
     // +-500 != 512, but close enough.
-    channeldata[channel] = otxbuffer[i] + ((otxbuffer[i+1] & 0xf0) << 4);
-    channeldata[channel+1] = ((otxbuffer[i+1] & 0x0f) << 4) + ((otxbuffer[i+2] & 0xf0) >> 4) + ((otxbuffer[i+2] & 0x0f) << 8);
+    channeldata[channel] = otxbuffer[i] + ((otxbuffer[i + 1] & 0xf0) << 4);
+    channeldata[channel + 1] = ((otxbuffer[i + 1] & 0x0f) << 4) + ((otxbuffer[i + 2] & 0xf0) >> 4) +
+                               ((otxbuffer[i + 2] & 0x0f) << 8);
   }
 
-  // If the data came from the radio, send it out over bluetooth. Send same data but add the START_STOP
-  if(settings.role == ROLE_BLE_PERIPHERAL) {
-    btp_sendChannelData(_otxbuffer, otxbufferIndex+1);
+  // If the data came from the radio, send it out over bluetooth. Send same data but add the
+  // START_STOP
+  if (settings.role == ROLE_BLE_PERIPHERAL) {
+    btp_sendChannelData(_otxbuffer, otxbufferIndex + 1);
   }
 }
 
@@ -138,21 +132,18 @@ void frSkyProcessByte(uint8_t data)
       if (data == START_STOP) {
         dataState = STATE_DATA_IN_FRAME;
         otxbufferIndex = 0;
-      }
-      else {
+      } else {
         appendTrainerByte(data);
       }
       break;
 
     case STATE_DATA_IN_FRAME:
       if (data == BYTE_STUFF) {
-        dataState = STATE_DATA_XOR; // XOR next byte
-      }
-      else if (data == START_STOP) {
+        dataState = STATE_DATA_XOR;  // XOR next byte
+      } else if (data == START_STOP) {
         dataState = STATE_DATA_IN_FRAME;
         otxbufferIndex = 0;
-      }
-      else {
+      } else {
         appendTrainerByte(data);
       }
       break;
@@ -165,7 +156,8 @@ void frSkyProcessByte(uint8_t data)
           appendTrainerByte(data ^ STUFF_MASK);
           dataState = STATE_DATA_IN_FRAME;
           break;
-        case START_STOP:  // Illegal situation, as we have START_STOP, try to start from the beginning
+        case START_STOP:  // Illegal situation, as we have START_STOP, try to start from the
+                          // beginning
           otxbufferIndex = 0;
           dataState = STATE_DATA_IN_FRAME;
           break;
@@ -180,8 +172,7 @@ void frSkyProcessByte(uint8_t data)
       if (data == START_STOP) {
         otxbufferIndex = 0;
         dataState = STATE_DATA_START;
-      }
-      else {
+      } else {
         appendTrainerByte(data);
       }
       break;
@@ -197,7 +188,7 @@ void frSkyProcessByte(uint8_t data)
         processTrainerFrame(otxbuffer);
         logBTFrame(true, "");
       } else {
-        logBTFrame(false, "Not a trainer frame");
+         logBTFrame(false, "Not a trainer frame");
       }
     } else {
       logBTFrame(false, "CRC Fault");
@@ -208,7 +199,7 @@ void frSkyProcessByte(uint8_t data)
 
 void processFrame(const uint8_t *frame, uint8_t len)
 {
-  for(int i=0;i < len; i++) {
+  for (int i = 0; i < len; i++) {
     frSkyProcessByte(frame[i]);
   }
 }
