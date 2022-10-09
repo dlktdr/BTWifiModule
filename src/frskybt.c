@@ -94,6 +94,8 @@ enum { STATE_DATA_IDLE, STATE_DATA_START, STATE_DATA_XOR, STATE_DATA_IN_FRAME };
 
 static uint8_t _otxbuffer[BLUETOOTH_LINE_LENGTH + 2] = {START_STOP};
 static uint8_t *otxbuffer = _otxbuffer + 1;
+static uint8_t rsndbuf[BLUETOOTH_LINE_LENGTH + 2];
+uint8_t rsndbufindex = 0;
 uint8_t otxbufferIndex = 0;
 bool btprocessed = false;
 
@@ -116,10 +118,14 @@ void processTrainerFrame(const uint8_t *otxbuffer)
                                ((otxbuffer[i + 2] & 0x0f) << 8);
   }
 
-  // If the data came from the radio, send it out over bluetooth. Send same data but add the
-  // START_STOP
   if (settings.role == ROLE_BLE_PERIPHERAL) {
-    btp_sendChannelData(_otxbuffer, otxbufferIndex + 1);
+    rsndbuf[rsndbufindex++] = 0x7e;
+    /*printf("BTDatOut ");
+    for(int i=0; i < rsndbufindex; i++) {
+      printf("%.2x ", rsndbuf[i]);
+    }
+    printf("\n");*/
+    btp_sendChannelData(rsndbuf, rsndbufindex);
   }
 }
 
@@ -132,6 +138,7 @@ void frSkyProcessByte(uint8_t data)
       if (data == START_STOP) {
         dataState = STATE_DATA_IN_FRAME;
         otxbufferIndex = 0;
+        rsndbufindex = 0;
       } else {
         appendTrainerByte(data);
       }
@@ -143,6 +150,7 @@ void frSkyProcessByte(uint8_t data)
       } else if (data == START_STOP) {
         dataState = STATE_DATA_IN_FRAME;
         otxbufferIndex = 0;
+        rsndbufindex = 0;
       } else {
         appendTrainerByte(data);
       }
@@ -159,6 +167,7 @@ void frSkyProcessByte(uint8_t data)
         case START_STOP:  // Illegal situation, as we have START_STOP, try to start from the
                           // beginning
           otxbufferIndex = 0;
+          rsndbufindex = 0;
           dataState = STATE_DATA_IN_FRAME;
           break;
         default:
@@ -171,6 +180,7 @@ void frSkyProcessByte(uint8_t data)
     case STATE_DATA_IDLE:
       if (data == START_STOP) {
         otxbufferIndex = 0;
+        rsndbufindex = 0;
         dataState = STATE_DATA_START;
       } else {
         appendTrainerByte(data);
@@ -179,6 +189,8 @@ void frSkyProcessByte(uint8_t data)
   }
 
   if (otxbufferIndex >= BLUETOOTH_PACKET_SIZE) {
+    if(rsndbufindex <= BLUETOOTH_LINE_LENGTH+1)
+      rsndbuf[rsndbufindex++] = data;
     uint8_t crc = 0x00;
     for (int i = 0; i < BLUETOOTH_PACKET_SIZE - 1; i++) {
       crc ^= otxbuffer[i];
@@ -186,14 +198,18 @@ void frSkyProcessByte(uint8_t data)
     if (crc == otxbuffer[BLUETOOTH_PACKET_SIZE - 1]) {
       if (otxbuffer[0] == TRAINER_FRAME) {
         processTrainerFrame(otxbuffer);
-        logBTFrame(true, "");
+       // logBTFrame(true, "");
       } else {
-         logBTFrame(false, "Not a trainer frame");
+        //logBTFrame(false, "Not a trainer frame");
       }
     } else {
-      logBTFrame(false, "CRC Fault");
+      //logBTFrame(false, "CRC Fault");
     }
     dataState = STATE_DATA_IDLE;
+  } else {
+    // Create a copy, split at start/stop
+    if(rsndbufindex <= BLUETOOTH_LINE_LENGTH+1)
+      rsndbuf[rsndbufindex++] = data;
   }
 }
 
