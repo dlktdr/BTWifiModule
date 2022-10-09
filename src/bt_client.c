@@ -129,10 +129,10 @@ void gattc_update_connection_params(esp_bd_addr_t *remote_bda)
 {
   esp_ble_conn_update_params_t conn_params;
   memcpy(conn_params.bda, remote_bda, sizeof(esp_bd_addr_t));
-  conn_params.min_int = 6;     // x 1.25ms
-  conn_params.max_int = 6;     // x 1.25ms
+  conn_params.min_int = BT_CON_INT_MIN;     // x 1.25ms
+  conn_params.max_int = BT_CON_INT_MAX;     // x 1.25ms
   conn_params.latency = 0x00;  // number of skippable connection events
-  conn_params.timeout = 160;   // x 6.25ms, time before peripheral will assume
+  conn_params.timeout = BT_CON_TIMEOUT;   // x 6.25ms, time before peripheral will assume
                                // connection is dropped.
 
   esp_ble_gap_update_conn_params(&conn_params);

@@ -398,9 +398,9 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
       /* For the IOS system, please reference the apple official documents about the ble connection
        * parameters restrictions. */
       conn_params.latency = 0;
-      conn_params.max_int = 0x6;
-      conn_params.min_int = 0x6;
-      conn_params.timeout = 400;
+      conn_params.max_int = BT_CON_INT_MIN;
+      conn_params.min_int = BT_CON_INT_MAX;
+      conn_params.timeout = BT_CON_TIMEOUT;
       ESP_LOGI(GATTS_TAG,
                "ESP_GATTS_CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:",
                param->connect.conn_id, param->connect.remote_bda[0], param->connect.remote_bda[1],
