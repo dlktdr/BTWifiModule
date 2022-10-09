@@ -167,11 +167,13 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
       if (mtu_ret) {
         ESP_LOGE(GATTC_TAG, "config MTU error, error code = %x", mtu_ret);
       }
-      /*esp_ble_gap_set_prefered_phy(param->connect.remote_bda,
+#if defined(BLUETOOTH5)
+      esp_ble_gap_set_prefered_phy(param->connect.remote_bda,
                                    ESP_BLE_GAP_NO_PREFER_TRANSMIT_PHY|ESP_BLE_GAP_NO_PREFER_RECEIVE_PHY,
                                    ESP_BLE_GAP_PHY_CODED_PREF_MASK,
                                    ESP_BLE_GAP_PHY_CODED_PREF_MASK,
-                                   ESP_BLE_GAP_PHY_OPTIONS_PREF_S8_CODING);*/
+                                   ESP_BLE_GAP_PHY_OPTIONS_PREF_S8_CODING);
+#endif
       btc_scan_complete = false;
       ESP_LOGI(GATTC_TAG, "Starting Service Scan");
       esp_ble_gattc_search_service(gattc_if, param->cfg_mtu.conn_id, &remote_filter_service_uuid);
