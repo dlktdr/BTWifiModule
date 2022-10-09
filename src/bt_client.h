@@ -30,10 +30,15 @@ typedef enum {
   BLE_BOARD_COUNT
 } ble_board_type;
 
+typedef struct {
+  esp_bd_addr_t addr;
+  esp_ble_addr_type_t type;
+} esp_bt_addr_t_rp;
+
 extern char *str_ble_board_types[BLE_BOARD_COUNT];
 extern uint8_t bt_scanned_address_cnt;
 
-extern esp_bd_addr_t btc_scanned_addresses[MAX_BLE_ADDRESSES];
+extern esp_bt_addr_t_rp btc_scanned_addresses[MAX_BLE_ADDRESSES];
 void btc_connect(esp_bd_addr_t addr);
 extern volatile bool btc_connected;
 extern volatile bool btc_scan_complete;

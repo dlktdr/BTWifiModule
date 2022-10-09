@@ -59,7 +59,7 @@ uint16_t bt_datahandle;
 uint16_t bt_htresethandle;
 esp_bd_addr_t rmtbtaddress;
 
-esp_bd_addr_t btc_scanned_addresses[MAX_BLE_ADDRESSES];
+esp_bt_addr_t_rp btc_scanned_addresses[MAX_BLE_ADDRESSES];
 
 /* Declare static functions */
 static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
@@ -433,14 +433,16 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
               scan_result->scan_rst.rssi > MIN_BLE_RSSI) {
             bool found = false;
             for (int i = 0; i < bt_scanned_address_cnt; i++) {
-              if (memcmp(btc_scanned_addresses[i], scan_result->scan_rst.bda,
+              if (memcmp(btc_scanned_addresses[i].addr, scan_result->scan_rst.bda,
                          sizeof(esp_bd_addr_t)) == 0) {
                 found = true;
                 break;
               }
             }
             if (!found) {
-              memcpy(btc_scanned_addresses[bt_scanned_address_cnt++], scan_result->scan_rst.bda,
+              btc_scanned_addresses[bt_scanned_address_cnt].type = scan_result->scan_rst.ble_addr_type;
+              memcpy(btc_scanned_addresses[bt_scanned_address_cnt++].addr, scan_result->scan_rst.bda,
+
                      sizeof(esp_bd_addr_t));
             }
           }
@@ -542,6 +544,7 @@ void btc_start_scan()
   if (!readytoscan) {
     return;
   }
+
   btc_scan_complete = false;
   bt_scanned_address_cnt = 0;
   printf("Clearing Addresses\r\n");
@@ -549,7 +552,10 @@ void btc_start_scan()
   esp_ble_gap_start_scanning(duration);
 }
 
-void btc_scan_stop() {}
+void btc_scan_stop()
+{
+  esp_ble_gap_stop_scanning();
+}
 
 void btc_connect(esp_bd_addr_t addr)
 {
@@ -558,8 +564,22 @@ void btc_connect(esp_bd_addr_t addr)
   btc_validslavefound = false;
   char saddr[13];
   memcpy(rmtbtaddress, addr, sizeof(esp_bd_addr_t));
-  printf("Connecting to %s\r\n", btaddrtostr(saddr, addr));  // TODO FIX ME
-  esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, addr, BLE_ADDR_TYPE_PUBLIC, true);
+
+  bool connstarted=false;
+  for(int i=0; i < bt_scanned_address_cnt; i++) {
+    if(memcmp(btc_scanned_addresses[i].addr, rmtbtaddress, sizeof(esp_bd_addr_t)) == 0) {
+      printf("Connecting to %s\r\n", btaddrtostr(saddr, addr));
+      if (btc_scanned_addresses[i].type == BLE_ADDR_TYPE_PUBLIC)
+        esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, addr, BLE_ADDR_TYPE_PUBLIC, true);
+      else if (btc_scanned_addresses[i].type == BLE_ADDR_TYPE_RANDOM)
+        esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, addr, BLE_ADDR_TYPE_RANDOM, true);
+      break;
+    }
+  }
+  if(!connstarted) {
+    printf("Unable to connect to %s, address not found in storage\r\n", btaddrtostr(saddr, addr));
+  }
+
 }
 
 void btc_disconnect()

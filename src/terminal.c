@@ -309,7 +309,7 @@ void runBTCentral()
       // New item(s) added
       for (int i = laddcnt; i < bt_scanned_address_cnt; i++) {
         char addr[13];
-        sprintf(reusablebuff, "OK+DISC:%s\r\n", btaddrtostr(addr, btc_scanned_addresses[i]));
+        sprintf(reusablebuff, "OK+DISC:%s\r\n", btaddrtostr(addr, btc_scanned_addresses[i].addr));
         // printf("%s",reusablebuff);
         uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
       }
