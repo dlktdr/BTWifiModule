@@ -352,9 +352,14 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
       if (p_data->notify.is_notify) {
         // TODO, verify what characteristic is being notified
 #ifdef DEBUG_TIMERS
-        processFrame(p_data->notify.value,
-                     p_data->notify.value_len);  // Used to decode the channel data for debugging
+        //processFrame(p_data->notify.value,
+          //           p_data->notify.value_len);  // Used to decode the channel data for debugging
 #endif
+        /*printf("ToUART");
+        for(int i=0; i < p_data->notify.value_len; i++) {
+          printf("%.2x ", p_data->notify.value[i]);
+        }
+        printf("\n");*/
         uart_write_bytes(uart_num, (void *)p_data->notify.value,
                          p_data->notify.value_len);  // Write the received data to the UART port
 
