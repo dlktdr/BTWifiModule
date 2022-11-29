@@ -2,6 +2,10 @@
 
 #include "espdefs.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Main functions to radio
 int espTrainerStart();
 void espTrainerStop();
@@ -17,3 +21,8 @@ void espTrainerDiscoverStop();
 void espTrainerDeviceDiscovered(const char *address);
 void espTrainerRFDataReceived(const channeldata *chans);
 void espTrainerDiscoverComplete();
+
+#ifdef __cplusplus
+}
+#endif
+

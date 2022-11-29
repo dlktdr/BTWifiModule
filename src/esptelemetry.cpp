@@ -29,7 +29,7 @@ void espTelemetryStop() {
 
 bool espTelemetryRunning() { return telemetrystarted; }
 
-bool espTelemetryExec()
+void espTelemetryExec()
 {
 
 }

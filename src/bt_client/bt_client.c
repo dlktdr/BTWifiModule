@@ -34,7 +34,7 @@
 #include "settings.h"
 
 #include "bt.h"
-#include "bt_client.h"
+#include "bt_client/bt_client.h"
 #include "frskybt.h"
 #include "terminal.h"
 #include "defines.h"

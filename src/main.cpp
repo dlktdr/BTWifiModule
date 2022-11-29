@@ -44,7 +44,7 @@ void runBlinky() {
 }
 #endif
 
-void app_main(void)
+extern "C" void app_main(void)
 {
   TaskHandle_t tUartHnd = NULL;
   xTaskCreate(mainTask, "UART", 65535, NULL, tskIDLE_PRIORITY+1, &tUartHnd);

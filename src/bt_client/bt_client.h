@@ -32,13 +32,22 @@ extern char *str_ble_board_types[BLE_BOARD_COUNT];
 extern uint8_t bt_scanned_address_cnt;
 
 extern esp_bd_addr_t btc_scanned_addresses[MAX_BLE_ADDRESSES];
-void btc_connect(esp_bd_addr_t addr);
 extern volatile bool btc_connected;
 extern volatile bool btc_scan_complete;
 extern volatile bool btc_validslavefound;
 extern volatile bool btc_ht_reset;
 extern volatile ble_board_type btc_board_type;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void btc_connect(esp_bd_addr_t addr);
 void btcInit();
 void btc_disconnect();
 void btc_start_scan();
 void btc_dohtreset();
+
+#ifdef __cplusplus
+}
+#endif

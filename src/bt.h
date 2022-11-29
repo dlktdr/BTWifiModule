@@ -8,8 +8,17 @@ extern esp_bd_addr_t rmtbtaddress;
 extern esp_bd_addr_t localbtaddress;
 extern char btname[];
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void strtobtaddr(esp_bd_addr_t dest, char *src);
 char *btaddrtostr(char dest[13], esp_bd_addr_t src);
 void bt_disable();
 void BTInit();
 void btSetName(const char *name);
+
+#ifdef __cplusplus
+}
+#endif
+

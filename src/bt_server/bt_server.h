@@ -12,8 +12,16 @@
 #include <string.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void btpInit();
 void btp_disconnect();
 int btp_sendChannelData(uint8_t *data, int len);
+
+#ifdef __cplusplus
+}
+#endif
 
 extern volatile bool btp_connected;

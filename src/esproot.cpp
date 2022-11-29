@@ -4,6 +4,7 @@
 #include "espdefs.h"
 #include "espjoystick.h"
 #include "esptrainer.h"
+#include "esptelemetry.h"
 #include "terminal.h"
 #include <stdint.h>
 #include <string.h>

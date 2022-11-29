@@ -47,11 +47,10 @@
  * please ignore.
  */
 
-#define HID_DEMO_TAG "HID_DEMO"
+#define HID_JOYSTICK "HID_JOYSTICK"
 
 uint16_t btj_conn_id = 0;
 static bool sec_conn = false;
-static bool send_volum_up = false;
 volatile bool btjoystickconnected = false;
 #define CHAR_DECLARATION_SIZE (sizeof(uint8_t))
 
@@ -114,7 +113,7 @@ static void hidd_event_callback(esp_hidd_cb_event_t event,
   case ESP_HIDD_EVENT_DEINIT_FINISH:
     break;
   case ESP_HIDD_EVENT_BLE_CONNECT: {
-    ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
+    ESP_LOGI(HID_JOYSTICK, "ESP_HIDD_EVENT_BLE_CONNECT");
     btjoystickconnected = true;
     btj_conn_id = param->connect.conn_id;
     break;
@@ -122,14 +121,14 @@ static void hidd_event_callback(esp_hidd_cb_event_t event,
   case ESP_HIDD_EVENT_BLE_DISCONNECT: {
     sec_conn = false;
     btjoystickconnected = false;
-    ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
+    ESP_LOGI(HID_JOYSTICK, "ESP_HIDD_EVENT_BLE_DISCONNECT");
     esp_ble_gap_start_advertising(&hidd_adv_params);
     break;
   }
   case ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT: {
-    ESP_LOGI(HID_DEMO_TAG, "%s, ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT",
+    ESP_LOGI(HID_JOYSTICK, "%s, ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT",
              __func__);
-    ESP_LOG_BUFFER_HEX(HID_DEMO_TAG, param->vendor_write.data,
+    ESP_LOG_BUFFER_HEX(HID_JOYSTICK, param->vendor_write.data,
                        param->vendor_write.length);
   }
   default:
@@ -146,7 +145,7 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event,
     break;
   case ESP_GAP_BLE_SEC_REQ_EVT:
     for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {
-      ESP_LOGD(HID_DEMO_TAG, "%x:", param->ble_security.ble_req.bd_addr[i]);
+      ESP_LOGD(HID_JOYSTICK, "%x:", param->ble_security.ble_req.bd_addr[i]);
     }
     esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
     break;
@@ -155,16 +154,16 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event,
     esp_bd_addr_t bd_addr;
     memcpy(bd_addr, param->ble_security.auth_cmpl.bd_addr,
            sizeof(esp_bd_addr_t));
-    ESP_LOGI(HID_DEMO_TAG, "remote BD_ADDR: %08x%04x",
+    ESP_LOGI(HID_JOYSTICK, "remote BD_ADDR: %08x%04x",
              (bd_addr[0] << 24) + (bd_addr[1] << 16) + (bd_addr[2] << 8) +
                  bd_addr[3],
              (bd_addr[4] << 8) + bd_addr[5]);
-    ESP_LOGI(HID_DEMO_TAG, "address type = %d",
+    ESP_LOGI(HID_JOYSTICK, "address type = %d",
              param->ble_security.auth_cmpl.addr_type);
-    ESP_LOGI(HID_DEMO_TAG, "pair status = %s",
+    ESP_LOGI(HID_JOYSTICK, "pair status = %s",
              param->ble_security.auth_cmpl.success ? "success" : "fail");
     if (!param->ble_security.auth_cmpl.success) {
-      ESP_LOGE(HID_DEMO_TAG, "fail reason = 0x%x",
+      ESP_LOGE(HID_JOYSTICK, "fail reason = 0x%x",
                param->ble_security.auth_cmpl.fail_reason);
     }
     break;

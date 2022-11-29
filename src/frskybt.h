@@ -15,6 +15,15 @@ enum {
   BT_SUCCESS=0,
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int setTrainer(uint8_t *addr, uint16_t chan_vals[BT_CHANNELS]);
 void frSkyProcessByte(uint8_t data);
 void processFrame(const uint8_t *frame, uint8_t len);
+
+#ifdef __cplusplus
+}
+#endif
+

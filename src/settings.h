@@ -23,5 +23,13 @@ typedef struct {
 extern settings_t settings;
 extern volatile bool settings_ok;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void loadSettings();
 void saveSettings();
+
+#ifdef __cplusplus
+}
+#endif
