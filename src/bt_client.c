@@ -34,6 +34,10 @@
 #include "settings.h"
 #include "terminal.h"
 
+#if defined(BLUETOOTH5)
+#include "esp_gap_ble_api.h"
+#endif
+
 #define GATTC_TAG "BTCLIENT"
 #define REMOTE_SERVICE_UUID 0xFFF0
 #define REMOTE_FRSKY_CHAR_UUID 0xFFF6
