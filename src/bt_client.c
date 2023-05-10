@@ -57,7 +57,6 @@ volatile ble_board_type btc_board_type = BLE_BOARD_UNKNOWN;
 volatile bool btc_ht_reset = false;
 uint16_t bt_datahandle;
 uint16_t bt_htresethandle;
-esp_bd_addr_t rmtbtaddress;
 
 esp_bt_addr_t_rp btc_scanned_addresses[MAX_BLE_ADDRESSES];
 

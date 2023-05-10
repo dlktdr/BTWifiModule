@@ -33,7 +33,7 @@ void strtobtaddr(esp_bd_addr_t dest, char *src)
 
 char *btaddrtostr(char dest[13], esp_bd_addr_t src)
 {
-  sprintf(dest, "%02X%02X%02X%02X%02X%02X\r\n", src[0], src[1], src[2], src[3], src[4], src[5]);
+  sprintf(dest, "%02X%02X%02X%02X%02X%02X", src[0], src[1], src[2], src[3], src[4], src[5]);
   dest[12] = '\0';
   return dest;
 }
