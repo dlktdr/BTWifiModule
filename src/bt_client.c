@@ -171,7 +171,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         ESP_LOGE(GATTC_TAG, "config MTU error, error code = %x", mtu_ret);
       }
 #if defined(BLUETOOTH5)
-      esp_ble_gap_set_prefered_phy(param->connect.remote_bda,
+      esp_ble_gap_set_preferred_phy(param->connect.remote_bda,
                                    ESP_BLE_GAP_NO_PREFER_TRANSMIT_PHY|ESP_BLE_GAP_NO_PREFER_RECEIVE_PHY,
                                    ESP_BLE_GAP_PHY_CODED_PREF_MASK,
                                    ESP_BLE_GAP_PHY_CODED_PREF_MASK,

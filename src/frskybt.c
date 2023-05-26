@@ -4,6 +4,7 @@
 #include "frskybt.h"
 
 #include <stdbool.h>
+#include <esp_timer.h>
 
 #include "bt_server.h"
 #include "esp_log.h"
