@@ -23,9 +23,9 @@
 #elif defined(PCB_C3MINI)
 
 #define UART_NUM UART_NUM_1
-#define UART_TXPIN 4
-#define UART_RXPIN 5
-//#define LEDPIN 6
+#define UART_TXPIN 21
+#define UART_RXPIN 20
+// #define LEDPIN 8
 
 #else
 
