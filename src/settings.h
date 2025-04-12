@@ -7,6 +7,7 @@ typedef struct {
   // uint8_t version // Todo the version info here, check on load it matches otherwise ignore
   char rmtbtaddr[13];
   role_t role;
+  char name[LEN_BLUETOOTH_NAME]; // Name of the device to broadcast instead of ESP32
 } settings_t;
 
 extern settings_t settings;

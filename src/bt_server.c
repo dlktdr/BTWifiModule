@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "bt.h"
+#include "settings.h"
 #include "esp_bt.h"
 #include "esp_bt_defs.h"
 #include "esp_bt_main.h"
@@ -476,9 +477,20 @@ int btp_sendChannelData(uint8_t *data, int len)
 
 void btpInit(void)
 {
+  esp_err_t ret;
+
   ESP_LOGI(GATTS_TAG, "Starting Peripherial");
 
-  esp_err_t ret = esp_ble_gatts_register_callback(gatts_event_handler);
+  if (settings.name[0] != '\0') { 
+    ESP_LOGI(GATTS_TAG, "Setting device name [%s]",settings.name);
+    ret = esp_ble_gap_set_device_name(settings.name);
+    if (ret) {
+      ESP_LOGE(GATTS_TAG, "set device name error, error code = %x", ret);
+      return;
+    }
+  }
+  
+  ret = esp_ble_gatts_register_callback(gatts_event_handler);
   if (ret) {
     ESP_LOGE(GATTS_TAG, "gatts register error, error code = %x", ret);
     return;
