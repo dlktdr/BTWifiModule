@@ -27,6 +27,12 @@
 #define UART_RXPIN 20
 // #define LEDPIN 8
 
+#elif defined(PCB_C3SUPERMINI)
+
+#define UART_NUM UART_NUM_1
+#define UART_TXPIN 21
+#define UART_RXPIN 20
+
 #else
 
 #error "PCB NOT Configured"
