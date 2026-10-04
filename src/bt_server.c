@@ -20,12 +20,6 @@
 
 #include "bt.h"
 #include "settings.h"
-#include "esp_bt.h"
-#include "esp_bt_defs.h"
-#include "esp_bt_main.h"
-#include "esp_gap_ble_api.h"
-#include "esp_gatt_common_api.h"
-#include "esp_gatts_api.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
@@ -34,7 +28,222 @@
 #include "nvs_flash.h"
 #include "sdkconfig.h"
 
+#if !defined(USE_NIMBLE)
+#include "esp_bt.h"
+#include "esp_bt_defs.h"
+#include "esp_bt_main.h"
+#include "esp_gap_ble_api.h"
+#include "esp_gatt_common_api.h"
+#include "esp_gatts_api.h"
+#endif
+
 #define GATTS_TAG "BTSERVER"
+
+#if defined(USE_NIMBLE)
+
+#include "nimble/nimble_port.h"
+#include "nimble/nimble_port_freertos.h"
+#include "host/ble_hs.h"
+#include "host/util/util.h"
+#include "host/ble_gap.h"
+#include "host/ble_gatt.h"
+#include "os/os_mbuf.h"
+
+#define BT_SVC_UUID 0xFFF0
+#define BT_CHR_UUID 0xFFF6
+
+volatile bool btp_connected = false;
+
+static const ble_uuid16_t bt_svc_uuid = BLE_UUID16_INIT(BT_SVC_UUID);
+static const ble_uuid16_t bt_chr_uuid = BLE_UUID16_INIT(BT_CHR_UUID);
+
+static uint16_t bt_chr_val_handle = 0;
+static uint16_t bt_conn_handle = 0xFFFF;
+static uint8_t bt_own_addr_type = 0;
+static uint8_t bt_chr_value[3] = {0x11, 0x22, 0x33};
+
+static uint8_t raw_adv_data[31];
+static uint8_t raw_adv_data_len = 0;
+
+static void buildAdvData(void)
+{
+  const char *name = settings.name[0] ? (const char *)settings.name : "BTWifiMod";
+  uint8_t nameLen = strnlen(name, LEN_BLUETOOTH_NAME);
+  uint8_t idx = 0;
+
+  // Flags: LE General Discoverable Mode | BR/EDR Not Supported
+  raw_adv_data[idx++] = 0x02;
+  raw_adv_data[idx++] = 0x01;
+  raw_adv_data[idx++] = 0x06;
+
+  // Complete list of 16-bit Service UUIDs (0xFFF0, little endian)
+  raw_adv_data[idx++] = 0x03;
+  raw_adv_data[idx++] = 0x02;
+  raw_adv_data[idx++] = 0xF0;
+  raw_adv_data[idx++] = 0xFF;
+
+  // Complete Local Name
+  if (nameLen > 0) {
+    raw_adv_data[idx++] = nameLen + 1;
+    raw_adv_data[idx++] = 0x09;
+    memcpy(&raw_adv_data[idx], name, nameLen);
+    idx += nameLen;
+  }
+
+  // TX Power Level
+  raw_adv_data[idx++] = 0x02;
+  raw_adv_data[idx++] = 0x0A;
+  raw_adv_data[idx++] = 0x00;
+
+  raw_adv_data_len = idx;
+  ESP_LOGI(GATTS_TAG, "Advertising as [%s]", name);
+}
+
+static int bt_gap_event(struct ble_gap_event *event, void *arg);
+
+static void bt_advertise(void)
+{
+  struct ble_gap_adv_params adv_params = {0};
+  adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;
+  adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN;
+
+  int rc = ble_gap_adv_start(bt_own_addr_type, NULL, BLE_HS_FOREVER, &adv_params,
+                             bt_gap_event, NULL);
+  if (rc != 0) {
+    ESP_LOGE(GATTS_TAG, "advertise start failed rc=%d", rc);
+  }
+}
+
+static int bt_chr_access(uint16_t conn_handle, uint16_t attr_handle,
+                         struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+  switch (ctxt->op) {
+    case BLE_GATT_ACCESS_OP_READ_CHR:
+      return os_mbuf_append(ctxt->om, bt_chr_value, sizeof(bt_chr_value)) == 0
+                 ? 0
+                 : BLE_ATT_ERR_INSUFFICIENT_RES;
+    case BLE_GATT_ACCESS_OP_WRITE_CHR:
+      // Incoming writes are not forwarded to the radio (same as Bluedroid build)
+      return 0;
+    default:
+      return BLE_ATT_ERR_UNLIKELY;
+  }
+}
+
+static const struct ble_gatt_chr_def bt_chrs[] = {
+    {
+        .uuid = (ble_uuid_t *)&bt_chr_uuid,
+        .access_cb = bt_chr_access,
+        .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_NOTIFY,
+        .val_handle = &bt_chr_val_handle,
+    },
+    {0},
+};
+
+static const struct ble_gatt_svc_def bt_svcs[] = {
+    {
+        .type = BLE_GATT_SVC_TYPE_PRIMARY,
+        .uuid = (ble_uuid_t *)&bt_svc_uuid,
+        .characteristics = bt_chrs,
+    },
+    {0},
+};
+
+static int bt_gap_event(struct ble_gap_event *event, void *arg)
+{
+  switch (event->type) {
+    case BLE_GAP_EVENT_CONNECT:
+      if (event->connect.status == 0) {
+        btp_connected = true;
+        bt_conn_handle = event->connect.conn_handle;
+        struct ble_gap_conn_desc desc;
+        if (ble_gap_conn_find(event->connect.conn_handle, &desc) == 0) {
+          btReverseAddr(desc.peer_ota_addr.val, rmtbtaddress);
+        }
+        ESP_LOGI(GATTS_TAG, "connect handle=%d", bt_conn_handle);
+      } else {
+        bt_advertise();
+      }
+      return 0;
+
+    case BLE_GAP_EVENT_DISCONNECT:
+      btp_connected = false;
+      bt_conn_handle = 0xFFFF;
+      ESP_LOGI(GATTS_TAG, "disconnect reason=%d", event->disconnect.reason);
+      bt_advertise();
+      return 0;
+
+    case BLE_GAP_EVENT_SUBSCRIBE:
+      ESP_LOGI(GATTS_TAG, "subscribe handle=%d notify=%d", event->subscribe.attr_handle,
+               event->subscribe.cur_notify);
+      return 0;
+
+    case BLE_GAP_EVENT_MTU:
+      ESP_LOGI(GATTS_TAG, "mtu=%d", event->mtu.value);
+      return 0;
+
+    case BLE_GAP_EVENT_ADV_COMPLETE:
+      bt_advertise();
+      return 0;
+
+    default:
+      return 0;
+  }
+}
+
+static void bt_on_sync(void)
+{
+  int rc = ble_hs_util_ensure_addr(0);
+  if (rc != 0) {
+    ESP_LOGE(GATTS_TAG, "ensure_addr rc=%d", rc);
+    return;
+  }
+
+  rc = ble_hs_id_infer_auto(0, &bt_own_addr_type);
+  if (rc != 0) {
+    ESP_LOGE(GATTS_TAG, "infer_auto rc=%d", rc);
+    return;
+  }
+
+  esp_bd_addr_t own;
+  ble_hs_id_copy_addr(bt_own_addr_type, own, NULL);
+  btReverseAddr(own, localbtaddress);
+
+  buildAdvData();
+  ble_gap_adv_set_data(raw_adv_data, raw_adv_data_len);
+  bt_advertise();
+}
+
+static void bt_gatts_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg)
+{
+  // no-op (kept for completeness)
+}
+
+int btp_sendChannelData(uint8_t *data, int len)
+{
+  if (!btp_connected || bt_conn_handle == 0xFFFF) return -1;
+
+  struct os_mbuf *om = ble_hs_mbuf_from_flat(data, len);
+  if (!om) return -1;
+
+  int rc = ble_gatts_notify_custom(bt_conn_handle, bt_chr_val_handle, om);
+  return (rc == 0) ? 0 : -1;
+}
+
+void btpInit(void)
+{
+  ESP_LOGI(GATTS_TAG, "Starting Peripherial (NimBLE)");
+
+  ble_hs_cfg.sync_cb = bt_on_sync;
+  ble_hs_cfg.gatts_register_cb = bt_gatts_register_cb;
+
+  ble_gatts_count_cfg(bt_svcs);
+  ble_gatts_add_svcs(bt_svcs);
+
+  nimble_port_freertos_init(bt_host_task);
+}
+
+#else  // !USE_NIMBLE (Bluedroid)
 
 /// Declare the static function
 static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
@@ -550,3 +759,5 @@ void btpInit(void)
   uint8_t adrtype;
   esp_ble_gap_get_local_used_addr(localbtaddress, &adrtype);
 }
+
+#endif  // USE_NIMBLE

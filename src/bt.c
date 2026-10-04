@@ -6,20 +6,28 @@
 
 #include <string.h>
 
-#include "defines.h"
-#include "settings.h"
 #include "esp_bt.h"
-#include "esp_bt_main.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/task.h"
 
+#if defined(USE_NIMBLE)
+#include "nimble/nimble_port.h"
+#include "nimble/nimble_port_freertos.h"
+#include "host/ble_hs.h"
+#include "services/gap/ble_svc_gap.h"
+#else
+#include "esp_bt_main.h"
+#endif
+
 
 #define LOG_BT "BT"
+#define MAX_BTNAME_LEN 50
 
 esp_bd_addr_t localbtaddress;
 esp_bd_addr_t rmtbtaddress;
 
+char btname[MAX_BTNAME_LEN] = "Hello";
 
 void strtobtaddr(esp_bd_addr_t dest, char *src)
 {
@@ -38,7 +46,67 @@ char *btaddrtostr(char dest[13], esp_bd_addr_t src)
   return dest;
 }
 
+#if defined(USE_NIMBLE)
+/* NimBLE reports addresses in little-endian (over-the-air) order, while
+ * btaddrtostr()/strtobtaddr() use display order. Reverse between the two. */
+void btReverseAddr(const uint8_t *src, uint8_t *dst)
+{
+  for (int i = 0; i < 6; i++) {
+    dst[i] = src[5 - i];
+  }
+}
+#endif
+
 bool memreleased = false;
+
+#if defined(USE_NIMBLE)
+
+static void bt_on_reset(int reason)
+{
+  ESP_LOGE(LOG_BT, "NimBLE reset; reason=%d", reason);
+}
+
+void bt_host_task(void *param)
+{
+  nimble_port_run();
+  nimble_port_freertos_deinit();
+}
+
+void bt_init()
+{
+  esp_err_t ret = nimble_port_init();
+  if (ret != ESP_OK) {
+    ESP_LOGE(LOG_BT, "nimble_port_init failed: %s", esp_err_to_name(ret));
+    return;
+  }
+
+  ble_hs_cfg.reset_cb = bt_on_reset;
+  // gatts_register_cb / sync_cb are set by the role init (btpInit / btcInit),
+  // which also starts the host task once the role is configured.
+
+  esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, ESP_PWR_LVL_P9);
+}
+
+void bt_disable()
+{
+  ESP_LOGI(LOG_BT, "Disabling Bluetooth (NimBLE)");
+  nimble_port_stop();
+  vTaskDelay(pdMS_TO_TICKS(BT_PAUSE_BEFORE_RESTART));
+  nimble_port_deinit();
+
+  ESP_LOGI(LOG_BT, "Pausing to shutdown");
+  vTaskDelay(pdMS_TO_TICKS(BT_PAUSE_BEFORE_RESTART));
+}
+
+void btSetName(const char *name)
+{
+  strncpy(btname, name, sizeof(btname));
+  btname[sizeof(btname) - 1] = '\0';
+  ble_svc_gap_device_name_set(btname);
+  ESP_LOGI(LOG_BT, "Setting BT Name %s", name);
+}
+
+#else  // !USE_NIMBLE (Bluedroid)
 
 void bt_init()
 {
@@ -91,9 +159,9 @@ void bt_disable()
 
 void btSetName(const char *name)
 {
-  strncpy(settings.name, name, sizeof(settings.name));
-  settings.name[sizeof(settings.name) - 1] = '\0';
-  saveSettings();
-  
-  ESP_LOGI(LOG_BT, "Setting BT Name %s", settings.name);
+  strncpy(btname, name, sizeof(btname));
+  btname[sizeof(btname) - 1] = '\0';
+  ESP_LOGI(LOG_BT, "Setting BT Name %s", name);
 }
+
+#endif  // USE_NIMBLE

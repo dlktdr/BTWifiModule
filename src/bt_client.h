@@ -13,7 +13,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(USE_NIMBLE)
+#include <stdint.h>
+typedef uint8_t esp_bd_addr_t[6];
+typedef uint8_t esp_ble_addr_type_t;
+#else
 #include "esp_bt_defs.h"
+#endif
 
 
 #define MAX_BLE_ADDRESSES 20
