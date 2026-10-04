@@ -6,6 +6,8 @@
 
 #include <string.h>
 
+#include "defines.h"
+#include "settings.h"
 #include "esp_bt.h"
 #include "esp_bt_main.h"
 #include "esp_err.h"
@@ -14,12 +16,10 @@
 
 
 #define LOG_BT "BT"
-#define MAX_BTNAME_LEN 50
 
 esp_bd_addr_t localbtaddress;
 esp_bd_addr_t rmtbtaddress;
 
-char btname[MAX_BTNAME_LEN] = "Hello";
 
 void strtobtaddr(esp_bd_addr_t dest, char *src)
 {
@@ -91,7 +91,9 @@ void bt_disable()
 
 void btSetName(const char *name)
 {
-  strncpy(btname, name, sizeof(btname));
-  btname[sizeof(btname) - 1] = '\0';
-  ESP_LOGI(LOG_BT, "Setting BT Name %s", name);
+  strncpy(settings.name, name, sizeof(settings.name));
+  settings.name[sizeof(settings.name) - 1] = '\0';
+  saveSettings();
+  
+  ESP_LOGI(LOG_BT, "Setting BT Name %s", settings.name);
 }

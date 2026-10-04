@@ -88,25 +88,54 @@ int setTrainer(uint8_t *addr, uint16_t chan_vals[BT_CHANNELS])
 }
 
 //----------------------------------
-// Receieve Code
+// Receive Code
 //----------------------------------
+//
+// Both the Bluetooth Trainer frame (0x80 + 12 channel bytes + CRC, 14 inner
+// bytes) and the S.Port telemetry frame forwarded by EdgeTX (8 byte
+// SportTelemetryPacket + CRC, 9 inner bytes) use the same 0x7E delimited,
+// 0x7D byte-stuffed framing. Instead of relying on a fixed 14 byte length we
+// delimit frames on the raw 0x7E and classify them by their unstuffed length.
 
-enum { STATE_DATA_IDLE, STATE_DATA_START, STATE_DATA_XOR, STATE_DATA_IN_FRAME };
+enum { STATE_DATA_IDLE, STATE_DATA_IN_FRAME, STATE_DATA_XOR };
 
-static uint8_t _otxbuffer[BLUETOOTH_LINE_LENGTH + 2] = {START_STOP};
-static uint8_t *otxbuffer = _otxbuffer + 1;
-static uint8_t rsndbuf[BLUETOOTH_LINE_LENGTH + 2];
-uint8_t rsndbufindex = 0;
-uint8_t otxbufferIndex = 0;
-bool btprocessed = false;
+#define FRSKY_SPORT_PACKET_SIZE 9                  // 8 byte S.Port payload + XOR CRC
+#define TRAINER_PACKET_SIZE BLUETOOTH_PACKET_SIZE  // 0x80 + 12 channels + XOR CRC
 
-void appendTrainerByte(uint8_t data)
+static uint8_t rxFrame[BLUETOOTH_LINE_LENGTH];
+static uint8_t rxFrameIndex = 0;
+static uint8_t dataState = STATE_DATA_IDLE;
+
+/**
+ * @brief Builds a 0x7E delimited, byte-stuffed frame from an already CRC'd
+ *        payload (the CRC is expected to be the last payload byte).
+ *
+ * @return length written into dst
+ */
+static uint8_t buildFramedFrame(uint8_t *dst, const uint8_t *payload, uint8_t len)
 {
-  if (otxbufferIndex < BLUETOOTH_LINE_LENGTH) {
-    otxbuffer[otxbufferIndex++] = data;
+  uint8_t idx = 0;
+  dst[idx++] = START_STOP;
+  for (uint8_t i = 0; i < len; i++) {
+    uint8_t byte = payload[i];
+    if (byte == START_STOP || byte == BYTE_STUFF) {
+      dst[idx++] = BYTE_STUFF;
+      byte ^= STUFF_MASK;
+    }
+    dst[idx++] = byte;
+  }
+  dst[idx++] = START_STOP;
+  return idx;
+}
+
+static void appendFrameByte(uint8_t data)
+{
+  if (rxFrameIndex < sizeof(rxFrame)) {
+    rxFrame[rxFrameIndex++] = data;
   } else {
-    ESP_LOGE(FRSKYBT_TAG, "OTX Buffer Overflow");
-    otxbufferIndex = 0;
+    ESP_LOGE(FRSKYBT_TAG, "RX Buffer Overflow");
+    rxFrameIndex = 0;
+    dataState = STATE_DATA_IDLE;
   }
 }
 
@@ -120,28 +149,64 @@ void processTrainerFrame(const uint8_t *otxbuffer)
   }
 
   if (settings.role == ROLE_BLE_PERIPHERAL) {
-    rsndbuf[rsndbufindex++] = 0x7e;
-    /*printf("BTDatOut ");
-    for(int i=0; i < rsndbufindex; i++) {
-      printf("%.2x ", rsndbuf[i]);
-    }
-    printf("\n");*/
-    btp_sendChannelData(rsndbuf, rsndbufindex);
+    uint8_t outbuf[2 * TRAINER_PACKET_SIZE + 2];
+    uint8_t outlen = buildFramedFrame(outbuf, otxbuffer, TRAINER_PACKET_SIZE);
+    btp_sendChannelData(outbuf, outlen);
+  }
+}
+
+/**
+ * @brief Forwards an 8 byte S.Port telemetry packet (plus trailing CRC) to the
+ *        connected BLE central, preserving the framing EdgeTX expects.
+ *
+ *        frame[0]   = physical id
+ *        frame[1]   = prim id (0x10 = data frame)
+ *        frame[2..3]= data id (little endian)
+ *        frame[4..7]= value (little endian)
+ *        frame[8]   = XOR CRC of the previous 8 bytes
+ */
+static void processSportFrame(const uint8_t *frame)
+{
+  if (settings.role == ROLE_BLE_PERIPHERAL) {
+    uint8_t outbuf[2 * FRSKY_SPORT_PACKET_SIZE + 2];
+    uint8_t outlen = buildFramedFrame(outbuf, frame, FRSKY_SPORT_PACKET_SIZE);
+    btp_sendChannelData(outbuf, outlen);
+  }
+
+  ESP_LOGD(FRSKYBT_TAG, "S.Port physical=%02X prim=%02X data=%04X", frame[0], frame[1],
+           (uint16_t)(frame[2] | (frame[3] << 8)));
+}
+
+static void handleFrame(const uint8_t *frame, uint8_t len)
+{
+  if (len < 2) return;
+
+  uint8_t crc = 0x00;
+  for (uint8_t i = 0; i < len - 1; i++) {
+    crc ^= frame[i];
+  }
+  if (crc != frame[len - 1]) {
+    // logBTFrame(false, "CRC Fault");
+    return;
+  }
+
+  if (len == TRAINER_PACKET_SIZE && frame[0] == TRAINER_FRAME) {
+    processTrainerFrame(frame);
+    // logBTFrame(true, "");
+  } else if (len == FRSKY_SPORT_PACKET_SIZE) {
+    processSportFrame(frame);
+  } else {
+    // logBTFrame(false, "Unknown frame");
   }
 }
 
 void frSkyProcessByte(uint8_t data)
 {
-  static uint8_t dataState = STATE_DATA_IDLE;
-
   switch (dataState) {
-    case STATE_DATA_START:
+    case STATE_DATA_IDLE:
       if (data == START_STOP) {
+        rxFrameIndex = 0;
         dataState = STATE_DATA_IN_FRAME;
-        otxbufferIndex = 0;
-        rsndbufindex = 0;
-      } else {
-        appendTrainerByte(data);
       }
       break;
 
@@ -149,68 +214,19 @@ void frSkyProcessByte(uint8_t data)
       if (data == BYTE_STUFF) {
         dataState = STATE_DATA_XOR;  // XOR next byte
       } else if (data == START_STOP) {
-        dataState = STATE_DATA_IN_FRAME;
-        otxbufferIndex = 0;
-        rsndbufindex = 0;
+        // Raw 0x7E can never appear inside a stuffed frame, so it delimits the end.
+        handleFrame(rxFrame, rxFrameIndex);
+        rxFrameIndex = 0;
+        dataState = STATE_DATA_IDLE;
       } else {
-        appendTrainerByte(data);
+        appendFrameByte(data);
       }
       break;
 
     case STATE_DATA_XOR:
-      switch (data) {
-        case BYTE_STUFF ^ STUFF_MASK:
-        case START_STOP ^ STUFF_MASK:
-          // Expected content, save the data
-          appendTrainerByte(data ^ STUFF_MASK);
-          dataState = STATE_DATA_IN_FRAME;
-          break;
-        case START_STOP:  // Illegal situation, as we have START_STOP, try to start from the
-                          // beginning
-          otxbufferIndex = 0;
-          rsndbufindex = 0;
-          dataState = STATE_DATA_IN_FRAME;
-          break;
-        default:
-          // Illegal situation, start looking for a new START_STOP byte
-          dataState = STATE_DATA_START;
-          break;
-      }
+      appendFrameByte(data ^ STUFF_MASK);
+      dataState = STATE_DATA_IN_FRAME;
       break;
-
-    case STATE_DATA_IDLE:
-      if (data == START_STOP) {
-        otxbufferIndex = 0;
-        rsndbufindex = 0;
-        dataState = STATE_DATA_START;
-      } else {
-        appendTrainerByte(data);
-      }
-      break;
-  }
-
-  if (otxbufferIndex >= BLUETOOTH_PACKET_SIZE) {
-    if(rsndbufindex <= BLUETOOTH_LINE_LENGTH+1)
-      rsndbuf[rsndbufindex++] = data;
-    uint8_t crc = 0x00;
-    for (int i = 0; i < BLUETOOTH_PACKET_SIZE - 1; i++) {
-      crc ^= otxbuffer[i];
-    }
-    if (crc == otxbuffer[BLUETOOTH_PACKET_SIZE - 1]) {
-      if (otxbuffer[0] == TRAINER_FRAME) {
-        processTrainerFrame(otxbuffer);
-       // logBTFrame(true, "");
-      } else {
-        //logBTFrame(false, "Not a trainer frame");
-      }
-    } else {
-      //logBTFrame(false, "CRC Fault");
-    }
-    dataState = STATE_DATA_IDLE;
-  } else {
-    // Create a copy, split at start/stop
-    if(rsndbufindex <= BLUETOOTH_LINE_LENGTH+1)
-      rsndbuf[rsndbufindex++] = data;
   }
 }
 

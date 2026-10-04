@@ -11,7 +11,6 @@
 
 extern esp_bd_addr_t rmtbtaddress;
 extern esp_bd_addr_t localbtaddress;
-extern char btname[];
 
 void strtobtaddr(esp_bd_addr_t dest, char *src);
 char *btaddrtostr(char dest[13], esp_bd_addr_t src);

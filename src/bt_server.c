@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "bt.h"
+#include "settings.h"
 #include "esp_bt.h"
 #include "esp_bt_defs.h"
 #include "esp_bt_main.h"
@@ -64,12 +65,45 @@ static uint8_t adv_config_done = 0;
 #define scan_rsp_config_flag (1 << 1)
 
 // FORMAT  <Bytes> <Flag> <Data>
-static uint8_t raw_adv_data[] = {
-    0x02, 0x01, 0x06,                       // General | NoBREDR
-    0x03, 0x02, 0xF0, 0xFF,                 // Available Service
-    0x06, 0x09, 'H',  'e',  'l', 'l', 'o',  // Name
-    0x02, 0x0A, 0x00                        // TX Power
-};
+#define ADV_DATA_MAX_LEN 31
+static uint8_t raw_adv_data[ADV_DATA_MAX_LEN];
+static uint8_t raw_adv_data_len = 0;
+
+/* Builds the advertising payload using the device name received from the
+ * radio through AT+NAME (settings.name) when available. */
+static void buildAdvData(void)
+{
+  const char *name = settings.name[0] ? (const char *)settings.name : "BTWifiMod";
+  uint8_t nameLen = strnlen(name, LEN_BLUETOOTH_NAME);
+  uint8_t idx = 0;
+
+  // Flags: LE General Discoverable Mode | BR/EDR Not Supported
+  raw_adv_data[idx++] = 0x02;
+  raw_adv_data[idx++] = 0x01;
+  raw_adv_data[idx++] = 0x06;
+
+  // Complete list of 16-bit Service UUIDs (0xFFF0, little endian)
+  raw_adv_data[idx++] = 0x03;
+  raw_adv_data[idx++] = 0x02;
+  raw_adv_data[idx++] = 0xF0;
+  raw_adv_data[idx++] = 0xFF;
+
+  // Complete Local Name
+  if (nameLen > 0) {
+    raw_adv_data[idx++] = nameLen + 1;
+    raw_adv_data[idx++] = 0x09;
+    memcpy(&raw_adv_data[idx], name, nameLen);
+    idx += nameLen;
+  }
+
+  // TX Power Level
+  raw_adv_data[idx++] = 0x02;
+  raw_adv_data[idx++] = 0x0A;
+  raw_adv_data[idx++] = 0x00;
+
+  raw_adv_data_len = idx;
+  ESP_LOGI(GATTS_TAG, "Advertising as [%s]", name);
+}
 
 // No Scan Response
 /*
@@ -245,7 +279,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
       if (set_dev_name_ret){
           ESP_LOGE(GATTS_TAG, "set device name failed, error code = %x", set_dev_name_ret);
       }*/
-      esp_err_t raw_adv_ret = esp_ble_gap_config_adv_data_raw(raw_adv_data, sizeof(raw_adv_data));
+      esp_err_t raw_adv_ret = esp_ble_gap_config_adv_data_raw(raw_adv_data, raw_adv_data_len);
       if (raw_adv_ret) {
         ESP_LOGE(GATTS_TAG, "config raw adv data failed, error code = %x ", raw_adv_ret);
       }
@@ -476,9 +510,22 @@ int btp_sendChannelData(uint8_t *data, int len)
 
 void btpInit(void)
 {
+  esp_err_t ret;
+
   ESP_LOGI(GATTS_TAG, "Starting Peripherial");
 
-  esp_err_t ret = esp_ble_gatts_register_callback(gatts_event_handler);
+  if (settings.name[0] != '\0') { 
+    ESP_LOGI(GATTS_TAG, "Setting device name [%s]",settings.name);
+    ret = esp_ble_gap_set_device_name(settings.name);
+    if (ret) {
+      ESP_LOGE(GATTS_TAG, "set device name error, error code = %x", ret);
+      return;
+    }
+  }
+
+  buildAdvData();
+
+  ret = esp_ble_gatts_register_callback(gatts_event_handler);
   if (ret) {
     ESP_LOGE(GATTS_TAG, "gatts register error, error code = %x", ret);
     return;
