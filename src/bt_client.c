@@ -59,6 +59,7 @@ volatile bool btc_connected = false;
 volatile bool btc_scan_complete = true;
 volatile ble_board_type btc_board_type = BLE_BOARD_UNKNOWN;
 volatile bool btc_ht_reset = false;
+static volatile bool btc_autoconnect = false;
 uint16_t bt_datahandle;
 uint16_t bt_htresethandle;
 
@@ -456,6 +457,27 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
                      sizeof(esp_bd_addr_t));
             }
           }
+          // Auto-connect: when looking for the last known device, connect as
+          // soon as it shows up in a scan result (so we know its address type).
+          if (btc_autoconnect && !btc_connected) {
+            esp_bd_addr_t saved;
+            strtobtaddr(saved, settings.rmtbtaddr);
+            if (memcmp(saved, scan_result->scan_rst.bda, sizeof(esp_bd_addr_t)) == 0) {
+              bool known = false;
+              for (int i = 0; i < bt_scanned_address_cnt; i++) {
+                if (memcmp(btc_scanned_addresses[i].addr, saved, sizeof(esp_bd_addr_t)) == 0) {
+                  known = true;
+                  break;
+                }
+              }
+              if (known) {
+                printf("Auto-connect: saved device found\r\n");
+                btc_autoconnect = false;
+                btc_scan_stop();
+                btc_connect(scan_result->scan_rst.bda);
+              }
+            }
+          }
           char addr[13];
           btaddrtostr(addr, scan_result->scan_rst.bda);
           printf("Disc BT Address %s, RSSI=%d, Addr Type=%d\n", addr, scan_result->scan_rst.rssi,
@@ -555,6 +577,7 @@ void btc_start_scan()
     return;
   }
 
+  btc_autoconnect = false;
   btc_scan_complete = false;
   bt_scanned_address_cnt = 0;
   printf("Clearing Addresses\r\n");
@@ -567,9 +590,33 @@ void btc_scan_stop()
   esp_ble_gap_stop_scanning();
 }
 
+bool btc_has_saved_address()
+{
+  return settings.rmtbtaddr[0] != '\0' && strcmp(settings.rmtbtaddr, "000000000000") != 0;
+}
+
+/* Scans continuously until the last known device shows up, then btc_connect()
+ * is triggered from the scan result handler. Returns false when the module is
+ * not ready yet or already connected. */
+bool btc_start_autoconnect()
+{
+  if (!readytoscan || btc_connected) {
+    return false;
+  }
+
+  btc_autoconnect = true;
+  btc_scan_complete = false;
+  btc_validslavefound = false;
+  bt_scanned_address_cnt = 0;
+  printf("Auto-connect: scanning for saved device\r\n");
+  esp_ble_gap_start_scanning(0);  // 0 = scan continuously until stopped
+  return true;
+}
+
 void btc_connect(esp_bd_addr_t addr)
 {
   if (btc_connected) return;
+  btc_autoconnect = false;
   btc_scan_complete = false;
   btc_validslavefound = false;
   char saddr[13];
@@ -583,6 +630,7 @@ void btc_connect(esp_bd_addr_t addr)
         esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, addr, BLE_ADDR_TYPE_PUBLIC, true);
       else if (btc_scanned_addresses[i].type == BLE_ADDR_TYPE_RANDOM)
         esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, addr, BLE_ADDR_TYPE_RANDOM, true);
+      connstarted = true;
       break;
     }
   }
@@ -634,8 +682,6 @@ void btcInit()
   esp_ble_gap_get_local_used_addr(localbtaddress, &adrtype);
 
   vTaskDelay(pdMS_TO_TICKS(500));
-  // Try to connect to saved address on startup
-  esp_bd_addr_t addr;
-  strtobtaddr(addr, settings.rmtbtaddr);
-  // btc_connect(addr);
+  // Auto-connect to the last known device is handled by the central state
+  // machine (CENTRAL_STATE_AUTOCONNECT) once scanning is ready.
 }

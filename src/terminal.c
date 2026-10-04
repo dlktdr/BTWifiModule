@@ -33,6 +33,7 @@ const uart_port_t uart_num = UART_NUM;
 typedef enum {
   CENTRAL_STATE_DISCONNECT,
   CENTRAL_STATE_IDLE,
+  CENTRAL_STATE_AUTOCONNECT,
   CENTRAL_STATE_SCAN_START,
   CENTRAL_STATE_SCANNING,
   CENTRAL_STATE_SCAN_COMPLETE,
@@ -69,6 +70,38 @@ void sendBTMode()
   }
 }
 
+/* Sends the "Connected" announcement block to the radio. Used when a
+ * connection is established and also to re-announce an already established
+ * connection (e.g. auto-connect finished before EdgeTX was listening). */
+void sendCentralConnected()
+{
+  if (curMode != ROLE_BLE_CENTRAL) return;
+
+  btaddrtostr(rmtaddress, rmtbtaddress);
+  snprintf(reusablebuff, sizeof(reusablebuff), "Connected:%s\r\n", rmtaddress);
+  uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
+
+  snprintf(reusablebuff, sizeof(reusablebuff),
+           "MTU Size:65\r\nMTU Size: 65\r\nPHT Update Complete\r\nCurrent PHY:2M\r\n");
+  uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
+
+  snprintf(reusablebuff, sizeof(reusablebuff), "Board:%s\r\n", str_ble_board_types[btc_board_type]);
+  uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
+
+  btCentralState = CENTRAL_STATE_CONNECTED;
+}
+
+/* Sends the "Connected" announcement for peripheral mode. Used when a central
+ * connects, and periodically afterwards in case the radio missed the first. */
+void sendPeripheralConnected()
+{
+  if (curMode != ROLE_BLE_PERIPHERAL) return;
+
+  btaddrtostr(rmtaddress, rmtbtaddress);
+  snprintf(reusablebuff, sizeof(reusablebuff), "Connected:%s\r\n", rmtaddress);
+  uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
+}
+
 void parserATCommand(char atcommand[])
 {
   // Strip trailing whitespace
@@ -92,6 +125,11 @@ void parserATCommand(char atcommand[])
     UART_WRITE_STRING(uart_num, "OK+Role:1\r\n");
     setRole(ROLE_BLE_CENTRAL);
     sendBTMode();
+    // If we are already connected (e.g. auto-connect finished before the radio
+    // was ready), re-announce it so EdgeTX moves to CONNECTED.
+    if (btc_connected) {
+      sendCentralConnected();
+    }
 
   } else if (strncmp(atcommand, "+CON", 4) == 0) {
     if (curMode == ROLE_BLE_CENTRAL) {
@@ -101,8 +139,13 @@ void parserATCommand(char atcommand[])
       uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
       // Store Remote Address to Connect to
       strcpy(rmtaddress, atcommand + 4);
-      // Start connection
-      btCentralState = CENTRAL_STATE_CONNECT;
+      if (btc_connected) {
+        // Already connected (e.g. via auto-connect) -> just re-announce.
+        sendCentralConnected();
+      } else {
+        // Start connection
+        btCentralState = CENTRAL_STATE_CONNECT;
+      }
     } else {
       UART_WRITE_STRING(uart_num, "ERROR");
     }
@@ -122,15 +165,23 @@ void parserATCommand(char atcommand[])
   } else if (strncmp(atcommand, "+DISC?", 6) == 0) {
     if (curMode == ROLE_BLE_CENTRAL) {
       ESP_LOGI(LOG_UART, "Discovery Requested");
+      // Drop an existing connection first: otherwise the trainer frames being
+      // forwarded would interleave with the "OK+DISC" response lines and make
+      // EdgeTX miss them (stuck on "Scanning").
+      if (btc_connected) {
+        btc_disconnect();
+      }
       UART_WRITE_STRING(uart_num, "OK+DISCS\r\n");
       laddcnt = 0;
-      if (btCentralState != CENTRAL_STATE_SCAN_START && btCentralState != CENTRAL_STATE_SCANNING)
-        btCentralState = CENTRAL_STATE_SCAN_START;
+      btCentralState = CENTRAL_STATE_SCAN_START;
     }
 
   } else if (strncmp(atcommand, "+CLEAR", 6) == 0) {
     if (curMode == ROLE_BLE_CENTRAL) {
       btCentralState = CENTRAL_STATE_DISCONNECT;
+      // Forget the paired device, otherwise auto-connect brings it back
+      memset(settings.rmtbtaddr, 0, sizeof(settings.rmtbtaddr));
+      saveSettings();
       UART_WRITE_STRING(uart_num, "OK+CLEAR\r\n");
     }
 
@@ -234,15 +285,19 @@ void runUARTHead()
           atcommandlen = -1;
         }
       } else {
-        // Scan for characters AT in the byte stream
-        static char lc = 0;
-        if (lc == 'A' && c == 'T') {
+        // Scan for the "AT+" prefix in the byte stream. Requiring the '+'
+        // (EdgeTX always sends "AT+...") avoids false triggers from 'A','T'
+        // sequences inside binary telemetry/trainer frames.
+        static char lc1 = 0;
+        static char lc2 = 0;
+        if (lc2 == 'A' && lc1 == 'T' && c == '+') {
           atcommandlen = 0;
+          atcommand[atcommandlen++] = '+';
         } else {
           frSkyProcessByte(c);
         }
-
-        lc = c;
+        lc2 = lc1;
+        lc1 = c;
       }
     }
 
@@ -297,6 +352,18 @@ void runBTCentral()
     case CENTRAL_STATE_DISCONNECT: {
       // Stop scanning, disconnect from all periferials
       btc_disconnect();
+      // Reconnect to the last known device when available
+      if (!btc_connected && btc_has_saved_address()) {
+        btCentralState = CENTRAL_STATE_AUTOCONNECT;
+      }
+      break;
+    }
+    case CENTRAL_STATE_AUTOCONNECT: {
+      if (btc_connected) {
+        btCentralState = CENTRAL_STATE_CONNECTED;
+      } else if (btc_start_autoconnect()) {
+        btCentralState = CENTRAL_STATE_WAITING_CONNECTION;
+      }
       break;
     }
     case CENTRAL_STATE_SCAN_START: {
@@ -326,12 +393,10 @@ void runBTCentral()
       break;
     }
     case CENTRAL_STATE_IDLE: {
-      // TODO Automatically try to connect to the last known bluetooth address
-      // esp_bd_addr_t btaddr;
-      // if(!readBTAddress(btaddr)) {
-      //  btCentralState = CENTRAL_STATE_CONNECT;
-      //}
-      // Do Nothing
+      // Try to reconnect to the last known bluetooth address
+      if (!btc_connected && btc_has_saved_address()) {
+        btCentralState = CENTRAL_STATE_AUTOCONNECT;
+      }
       break;
     }
 
@@ -346,6 +411,9 @@ void runBTCentral()
     case CENTRAL_STATE_WAITING_CONNECTION: {
       if (btc_scan_complete) {
         if (btc_validslavefound) {
+          // btc_connect() stores the actual remote address, which is also the
+          // right value when we got here through auto-connect.
+          btaddrtostr(rmtaddress, rmtbtaddress);
           sprintf(reusablebuff, "Connected:%s\r\n", rmtaddress);
           uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
           sprintf(
@@ -367,8 +435,27 @@ void runBTCentral()
 
     case CENTRAL_STATE_CONNECTED: {
       if (!btc_connected) {  // Connection Lost
-        btCentralState = CENTRAL_STATE_CONNECT;
+        // Tell the radio so EdgeTX leaves the CONNECTED state. The leading
+        // 0x7E resets EdgeTX's trainer frame parser to a known state so the
+        // "DisConnected" text is always recognised.
+        static const char disconnMsg[] = "\x7e" "DisConnected\r\n";
+        uart_write_bytes(uart_num, disconnMsg, sizeof(disconnMsg) - 1);
+        if (btc_has_saved_address()) {
+          btCentralState = CENTRAL_STATE_AUTOCONNECT;
+        } else {
+          btCentralState = CENTRAL_STATE_CONNECT;
+        }
+      } else {
+        // Re-announce periodically in case the radio missed the initial
+        // "Connected:" message (e.g. it was not in an accepting state yet).
+        static int64_t lastAnnounce = 0;
+        int64_t now = esp_timer_get_time();
+        if (now - lastAnnounce > 2000000) {  // every 2s
+          lastAnnounce = now;
+          sendCentralConnected();
+        }
       }
+      break;
     }
   }
 }
@@ -378,10 +465,7 @@ void runBTPeripherial()
   switch (btPeripherialState) {
     case PERIPHERIAL_STATE_DISCONNECTED:
       if (btp_connected) {
-        // Save Remote Address
-        btaddrtostr(rmtaddress, rmtbtaddress);
-        sprintf(reusablebuff, "Connected:%s\r\n", rmtaddress);
-        uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
+        sendPeripheralConnected();
         btPeripherialState = PERIPHERIAL_STATE_CONNECTED;
       }
       break;
@@ -389,6 +473,14 @@ void runBTPeripherial()
       if (!btp_connected) {
         btPeripherialState = PERIPHERIAL_STATE_DISCONNECTED;
         uart_write_bytes(uart_num, "DisConnected\r\nERROR\r\nERROR\r\n", 28);
+      } else {
+        // Re-announce periodically in case the radio missed the first one.
+        static int64_t lastAnnounce = 0;
+        int64_t now = esp_timer_get_time();
+        if (now - lastAnnounce > 2000000) {  // every 2s
+          lastAnnounce = now;
+          sendPeripheralConnected();
+        }
       }
       break;
   }

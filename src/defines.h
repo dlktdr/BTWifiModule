@@ -48,7 +48,7 @@
 // Optional Debugging Options
 #define DEBUG_TIMERS
 
-#define LEN_BLUETOOTH_NAME 10
+#define LEN_BLUETOOTH_NAME 20
 
 #include <driver/uart.h>
 extern const uart_port_t uart_num;

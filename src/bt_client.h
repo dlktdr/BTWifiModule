@@ -48,4 +48,7 @@ extern volatile ble_board_type btc_board_type;
 void btcInit();
 void btc_disconnect();
 void btc_start_scan();
+void btc_scan_stop();
+bool btc_has_saved_address();
+bool btc_start_autoconnect();
 void btc_dohtreset();
