@@ -104,6 +104,11 @@ void sendPeripheralConnected()
 
 void parserATCommand(char atcommand[])
 {
+  // Any AT command means EdgeTX is (re)initialising: pause the trainer
+  // passthrough until the role is confirmed again, so the AT handshake is not
+  // drowned by the high rate trainer stream.
+  btc_forwardHt = false;
+
   // Strip trailing whitespace
   bool done = false;
   while (!done) {
@@ -124,6 +129,7 @@ void parserATCommand(char atcommand[])
     ESP_LOGI(LOG_UART, "Setting role as Central");
     UART_WRITE_STRING(uart_num, "OK+Role:1\r\n");
     setRole(ROLE_BLE_CENTRAL);
+    btc_forwardHt = true;
     sendBTMode();
     // If we are already connected (e.g. auto-connect finished before the radio
     // was ready), re-announce it so EdgeTX moves to CONNECTED.
@@ -139,6 +145,7 @@ void parserATCommand(char atcommand[])
       uart_write_bytes(uart_num, reusablebuff, strlen(reusablebuff));
       // Store Remote Address to Connect to
       strcpy(rmtaddress, atcommand + 4);
+      btc_forwardHt = true;
       if (btc_connected) {
         // Already connected (e.g. via auto-connect) -> just re-announce.
         sendCentralConnected();
@@ -264,6 +271,10 @@ void runUARTHead()
     }
   }
 
+  // Peripheral-mode passthrough buffer (fits the minimum ATT MTU payload).
+  static uint8_t passBuf[20];
+  static uint8_t passLen = 0;
+
   while (1) {
     int cnt = uart_read_bytes(uart_num, data, UART_RX_BUFFER, 0);
     for (int i = 0; i < cnt; i++) cb_push_back(&uartinbuf, &data[i]);
@@ -293,12 +304,28 @@ void runUARTHead()
         if (lc2 == 'A' && lc1 == 'T' && c == '+') {
           atcommandlen = 0;
           atcommand[atcommandlen++] = '+';
+        } else if (curMode == ROLE_BLE_PERIPHERAL) {
+          // Forward the radio's telemetry/trainer bytes unchanged. EdgeTX
+          // already frames S.Port (0x7E delimited) and forwards CRSF raw, and
+          // the client app auto-detects the protocol. Sent in MTU-sized chunks
+          // so both S.Port and CRSF work (the old S.Port-only parser overflowed
+          // on CRSF streams).
+          passBuf[passLen++] = c;
+          if (passLen >= sizeof(passBuf)) {
+            btp_sendChannelData(passBuf, passLen);
+            passLen = 0;
+          }
         } else {
           frSkyProcessByte(c);
         }
         lc2 = lc1;
         lc1 = c;
       }
+    }
+
+    if (passLen > 0) {
+      btp_sendChannelData(passBuf, passLen);
+      passLen = 0;
     }
 
     runBT();

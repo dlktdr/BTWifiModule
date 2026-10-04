@@ -41,6 +41,12 @@
 #include "esp_gap_ble_api.h"
 #endif
 
+/* Set while the module is allowed to forward the connected central's trainer
+ * frames to the radio. It stays false during EdgeTX's AT handshake so the
+ * (high rate) trainer stream cannot drown the AT responses, and is enabled on
+ * AT+ROLE1 / AT+CON. */
+volatile bool btc_forwardHt = false;
+
 #define GATTC_TAG "BTCLIENT"
 #define REMOTE_SERVICE_UUID 0xFFF0
 #define REMOTE_FRSKY_CHAR_UUID 0xFFF6
@@ -268,7 +274,8 @@ static int btc_gap_event(struct ble_gap_event *event, void *arg)
     case BLE_GAP_EVENT_NOTIFY_RX: {
       uint8_t buf[256];
       uint16_t len = 0;
-      if (ble_hs_mbuf_to_flat(event->notify_rx.om, buf, sizeof(buf), &len) == 0 && len > 0) {
+      if (btc_forwardHt &&
+          ble_hs_mbuf_to_flat(event->notify_rx.om, buf, sizeof(buf), &len) == 0 && len > 0) {
         uart_write_bytes(uart_num, buf, len);
       }
       return 0;
@@ -737,8 +744,10 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
           printf("%.2x ", p_data->notify.value[i]);
         }
         printf("\n");*/
-        uart_write_bytes(uart_num, (void *)p_data->notify.value,
-                         p_data->notify.value_len);  // Write the received data to the UART port
+        if (btc_forwardHt) {
+          uart_write_bytes(uart_num, (void *)p_data->notify.value,
+                           p_data->notify.value_len);  // Write the received data to the UART port
+        }
 
         // if(p_data->notify.handle == bt_datahandle) // If notify coming from the
         // data handle, send it to the UART port

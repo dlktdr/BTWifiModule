@@ -51,6 +51,7 @@ extern volatile bool btc_scan_complete;
 extern volatile bool btc_validslavefound;
 extern volatile bool btc_ht_reset;
 extern volatile ble_board_type btc_board_type;
+extern volatile bool btc_forwardHt;
 void btcInit();
 void btc_disconnect();
 void btc_start_scan();
